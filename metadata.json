@@ -1,0 +1,6 @@
+{
+  "name": "HLM Strength Trainer",
+  "description": "A focused strength training log for Heavy, Light, and Medium intensity programs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

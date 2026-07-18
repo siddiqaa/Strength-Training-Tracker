@@ -1,0 +1,52 @@
+{
+  "entities": {
+    "Workout": {
+      "title": "Workout Log",
+      "description": "A single exercise set logged by a user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The UID of the user who owns this log."
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date and time the workout was logged."
+        },
+        "exerciseName": {
+          "type": "string",
+          "description": "Name of the exercise (e.g., Squat, Bench Press)."
+        },
+        "weight": {
+          "type": "number",
+          "description": "The weight used in the set."
+        },
+        "reps": {
+          "type": "number",
+          "description": "Number of repetitions performed."
+        },
+        "sets": {
+          "type": "number",
+          "description": "Number of sets performed."
+        },
+        "intensity": {
+          "type": "string",
+          "enum": ["Heavy", "Light", "Medium"],
+          "description": "The intensity tier of the workout."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional notes about the set."
+        }
+      },
+      "required": ["userId", "date", "exerciseName", "weight", "reps", "intensity"]
+    }
+  },
+  "firestore": {
+    "/workouts/{workoutId}": {
+      "schema": "Workout",
+      "description": "Collection of all workout logs."
+    }
+  }
+}
