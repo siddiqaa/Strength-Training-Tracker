@@ -1,20 +1,5 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Strength Training Tracker
 
-# Run and deploy your AI Studio app
+The Heavy Low Medium Strength System is a minimalist web application designed to help users track their strength training workouts. It allows logging daily exercises, adjusting weights and reps based on target sets, and monitoring progress over time, ensuring a balanced approach to fitness with varying intensities.
 
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/4de3a1cc-76d7-4267-ae54-cd2ee25ff075
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+[View Deployment](https://strengthtrainingtracker.adnans.workers.dev/)

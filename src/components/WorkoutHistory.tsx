@@ -93,14 +93,27 @@ function TableCell({ workout }: { workout?: Workout }) {
   if (!workout) return <div className="text-zinc-700 text-xs font-mono text-center py-2">-</div>;
 
   return (
-    <div className="flex items-center justify-center gap-1.5 py-2 px-1 text-xs font-mono font-black text-white whitespace-nowrap">
-      <span>
-        {workout.weight} <span className="text-zinc-500">lb</span>
-      </span>
-      <span className="text-zinc-700">|</span>
-      <span className="text-zinc-300">
-        {workout.set1}/{workout.set2}{workout.set3 !== undefined && workout.set3 !== null ? `/${workout.set3}` : ''}
-      </span>
+    <div className="flex flex-col items-center justify-center gap-0.5 py-1.5 px-1 text-xs font-mono whitespace-nowrap">
+      <div className="flex items-center gap-1.5 font-black text-white">
+        <span>
+          {workout.weight} <span className="text-zinc-500 font-normal">lb</span>
+        </span>
+        <span className="text-zinc-700">|</span>
+        <span className="text-zinc-300">
+          {workout.set1}/{workout.set2}{workout.set3 !== undefined && workout.set3 !== null ? `/${workout.set3}` : ''}
+        </span>
+      </div>
+      {workout.rpe && (
+        <div className="flex items-center">
+          <span className={`text-[9px] px-1.5 rounded-sm ${
+            workout.rpe === 'E' ? 'bg-blue-500/20 text-blue-400' :
+            workout.rpe === 'M' ? 'bg-orange-500/20 text-orange-400' :
+            'bg-red-500/20 text-red-400'
+          }`}>
+            RPE: {workout.rpe}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

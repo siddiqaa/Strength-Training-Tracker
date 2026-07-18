@@ -35,6 +35,7 @@ export interface Workout {
   targetWeight?: number;
   targetReps?: string;
   targetSets?: number;
+  rpe?: 'E' | 'M' | 'H';
 }
 
 export interface UserProfile {

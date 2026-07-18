@@ -247,6 +247,7 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
   const [set1, set1Reps] = useState(target.reps.split('-')[0] || target.reps);
   const [set2, set2Reps] = useState(target.reps.split('-')[0] || target.reps);
   const [set3, set3Reps] = useState(target.reps.split('-')[0] || target.reps);
+  const [rpe, setRpe] = useState<'E' | 'M' | 'H'>('M');
   const [isLogging, setIsLogging] = useState(false);
 
   const lastWorkoutWeight = React.useMemo(() => {
@@ -259,6 +260,7 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
     set1Reps(target.reps.split('-')[0] || target.reps);
     set2Reps(target.reps.split('-')[0] || target.reps);
     set3Reps(target.reps.split('-')[0] || target.reps);
+    setRpe('M');
   }, [target]);
 
   const expectedSets = target.sets || 3;
@@ -278,6 +280,7 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
         targetWeight: target.weight,
         targetReps: target.reps,
         targetSets: expectedSets,
+        rpe,
         date: serverTimestamp(),
       });
     } catch (err) {
@@ -341,13 +344,32 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
         <span className="text-zinc-600 font-black px-1 hidden md:flex items-center">|</span>
         
         <div className="flex items-center justify-between w-full md:w-auto gap-2">
-          <span className="text-zinc-500 text-[10px] font-mono uppercase tracking-widest md:hidden">Reps</span>
-          <div className="flex gap-1.5 md:gap-1">
-            <input type="number" value={set1} onChange={e => set1Reps(Number(e.target.value))} className="w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 1 Reps" />
-            <input type="number" value={set2} onChange={e => set2Reps(Number(e.target.value))} className="w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 2 Reps" />
-            {expectedSets >= 3 && (
-              <input type="number" value={set3} onChange={e => set3Reps(Number(e.target.value))} className="w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 3 Reps" />
-            )}
+          <span className="text-zinc-500 text-[10px] font-mono uppercase tracking-widest md:hidden">Reps / RPE</span>
+          <div className="flex items-center gap-1.5 md:gap-2">
+            <div className="flex gap-1.5 md:gap-1">
+              <input type="number" value={set1} onChange={e => set1Reps(Number(e.target.value))} className="w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 1 Reps" />
+              <input type="number" value={set2} onChange={e => set2Reps(Number(e.target.value))} className="w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 2 Reps" />
+              {expectedSets >= 3 && (
+                <input type="number" value={set3} onChange={e => set3Reps(Number(e.target.value))} className="w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 3 Reps" />
+              )}
+            </div>
+            
+            <div className="flex items-center p-0.5 bg-zinc-950 md:bg-zinc-900 rounded-lg border border-zinc-700 ml-1 md:ml-0">
+              {(['E', 'M', 'H'] as const).map(level => (
+                <button
+                  key={level}
+                  onClick={() => setRpe(level)}
+                  className={`w-[26px] h-[34px] md:w-6 md:h-8 rounded md:rounded-md text-[10px] font-black transition-colors flex items-center justify-center ${
+                    rpe === level 
+                      ? level === 'E' ? 'bg-blue-500 text-white' : level === 'M' ? 'bg-orange-500 text-white' : 'bg-red-500 text-white'
+                      : 'text-zinc-500 hover:text-white hover:bg-zinc-800'
+                  }`}
+                  title={`RPE ${level === 'E' ? 'Easy' : level === 'M' ? 'Medium' : 'Hard'}`}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>

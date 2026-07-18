@@ -40,6 +40,7 @@ service cloud.firestore {
         && (!('targetWeight' in data) || data.targetWeight == null || data.targetWeight is number)
         && (!('targetReps' in data) || data.targetReps == null || data.targetReps is string)
         && (!('targetSets' in data) || data.targetSets == null || data.targetSets is number)
+        && (!('rpe' in data) || data.rpe == null || data.rpe in ['E', 'M', 'H'])
         && data.date is timestamp;
     }
 
@@ -47,14 +48,14 @@ service cloud.firestore {
       allow create: if isSignedIn() 
         && isValidWorkout(incoming())
         && incoming().keys().hasAll(['userId', 'exerciseName', 'weight', 'set1', 'set2', 'intensity', 'date'])
-        && incoming().keys().size() <= 12; // Including optional set3, notes and targets
+        && incoming().keys().size() <= 13; // Including optional set3, notes, targets, rpe
 
       allow read: if request.auth != null && request.auth.uid == resource.data.userId;
 
       allow update: if request.auth != null && request.auth.uid == resource.data.userId
         && isValidWorkout(incoming())
         && incoming().userId == resource.data.userId // Immutable userId
-        && incoming().diff(resource.data).affectedKeys().hasOnly(['exerciseName', 'weight', 'set1', 'set2', 'set3', 'intensity', 'notes', 'targetWeight', 'targetReps', 'targetSets', 'date']);
+        && incoming().diff(resource.data).affectedKeys().hasOnly(['exerciseName', 'weight', 'set1', 'set2', 'set3', 'intensity', 'notes', 'targetWeight', 'targetReps', 'targetSets', 'date', 'rpe']);
 
       allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
