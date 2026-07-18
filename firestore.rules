@@ -49,15 +49,14 @@ service cloud.firestore {
         && incoming().keys().hasAll(['userId', 'exerciseName', 'weight', 'set1', 'set2', 'intensity', 'date'])
         && incoming().keys().size() <= 12; // Including optional set3, notes and targets
 
-      allow read: if isSignedIn() && isOwner(existing().userId);
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
 
-      allow update: if isSignedIn() 
-        && isOwner(existing().userId)
+      allow update: if request.auth != null && request.auth.uid == resource.data.userId
         && isValidWorkout(incoming())
-        && incoming().userId == existing().userId // Immutable userId
-        && incoming().diff(existing()).affectedKeys().hasOnly(['exerciseName', 'weight', 'set1', 'set2', 'set3', 'intensity', 'notes', 'targetWeight', 'targetReps', 'targetSets', 'date']);
+        && incoming().userId == resource.data.userId // Immutable userId
+        && incoming().diff(resource.data).affectedKeys().hasOnly(['exerciseName', 'weight', 'set1', 'set2', 'set3', 'intensity', 'notes', 'targetWeight', 'targetReps', 'targetSets', 'date']);
 
-      allow delete: if isSignedIn() && isOwner(existing().userId);
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
     
     match /userPlans/{userId} {

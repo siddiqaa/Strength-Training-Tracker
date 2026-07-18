@@ -27,18 +27,19 @@ export default function App() {
 
   return (
     <div className="min-h-screen pb-12 bg-zinc-950 text-zinc-100 font-sans p-4 sm:p-6 overflow-x-hidden flex flex-col">
-      <header className="flex justify-between items-end mb-8 border-b border-zinc-800 pb-4 max-w-5xl mx-auto w-full">
-        <div>
-          <h1 className="text-3xl font-black tracking-tighter text-white">HLM<span className="text-orange-500">PRO</span></h1>
-          <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">Heavy Low Medium Strength System</p>
+      <header className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8 border-b border-zinc-800 pb-4 max-w-5xl mx-auto w-full">
+        <div className="flex-1 text-center md:text-left">
+          <h1 className="text-[10px] md:text-xs font-black uppercase tracking-widest text-zinc-300">Heavy Low Medium Strength System</h1>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <Auth />
+        <div className="flex-1 text-center order-first md:order-none">
           {user && (
-            <p className="text-xl font-bold text-orange-500 uppercase">
-              {new Date().toLocaleDateString('en-US', { weekday: 'long' })}
+            <p className="text-[10px] md:text-xs font-bold text-orange-500 uppercase tracking-widest">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
             </p>
           )}
+        </div>
+        <div className="flex-1 flex justify-center md:justify-end">
+          <Auth />
         </div>
       </header>
 

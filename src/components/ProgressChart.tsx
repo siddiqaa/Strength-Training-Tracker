@@ -5,23 +5,8 @@ import { Workout } from '../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 
-export function ProgressChart() {
-  const [workouts, setWorkouts] = useState<Workout[]>([]);
+export function ProgressChart({ workouts }: { workouts: Workout[] }) {
   const [selectedExercise, setSelectedExercise] = useState<string>('');
-
-  useEffect(() => {
-    if (!auth.currentUser) return;
-    const q = query(
-      collection(db, 'workouts'),
-      where('userId', '==', auth.currentUser.uid),
-      orderBy('date', 'asc')
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Workout[];
-      setWorkouts(docs);
-    });
-    return () => unsubscribe();
-  }, []);
 
   const exercises = useMemo(() => {
     const exList = Array.from(new Set(workouts.map(w => w.exerciseName)));
@@ -41,14 +26,15 @@ export function ProgressChart() {
     
     const exerciseWorkouts = workouts
       .filter(w => w.exerciseName === selectedExercise && w.date)
-      .sort((a, b) => a.date.toMillis() - b.date.toMillis());
+      .sort((a, b) => a.date - b.date);
 
     exerciseWorkouts.forEach(w => {
-      const dateStr = w.date.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const dateObj = new Date(w.date);
+      const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       if (!dataByDate.has(dateStr)) {
         dataByDate.set(dateStr, {
           date: dateStr,
-          timestamp: w.date.toMillis(),
+          timestamp: w.date,
         });
       }
       const entry = dataByDate.get(dateStr);

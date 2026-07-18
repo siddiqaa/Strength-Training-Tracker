@@ -7,45 +7,8 @@ import { db, auth, handleFirestoreError } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { Workout, OperationType } from '../types';
 import { History, Calendar } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 
-export function WorkoutHistory() {
-  const [workouts, setWorkouts] = useState<Workout[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!auth.currentUser) {
-      setWorkouts([]);
-      setLoading(false);
-      return;
-    }
-
-    const path = 'workouts';
-    const q = query(
-      collection(db, path),
-      where('userId', '==', auth.currentUser.uid),
-      orderBy('date', 'desc')
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-
-      })) as Workout[];
-      setWorkouts(docs);
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, path);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  if (loading) {
-    return <div className="text-center py-12 text-zinc-500 font-mono text-sm uppercase tracking-widest animate-pulse">Loading history...</div>;
-  }
-
+export function WorkoutHistory({ workouts }: { workouts: Workout[] }) {
   if (workouts.length === 0) {
     return (
       <div className="text-center py-12 bg-zinc-900/50 rounded-2xl border border-dashed border-zinc-800">
@@ -74,7 +37,7 @@ export function WorkoutHistory() {
                 {workouts.find(w => w.intensity === 'Heavy')?.date && (
                   <div className="text-[8px] text-zinc-600 mt-1 flex items-center justify-center gap-1">
                     <Calendar className="w-2.5 h-2.5" />
-                    {workouts.find(w => w.intensity === 'Heavy')?.date?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {new Date(workouts.find(w => w.intensity === 'Heavy')!.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </div>
                 )}
               </th>
@@ -83,7 +46,7 @@ export function WorkoutHistory() {
                 {workouts.find(w => w.intensity === 'Light')?.date && (
                   <div className="text-[8px] text-zinc-600 mt-1 flex items-center justify-center gap-1">
                     <Calendar className="w-2.5 h-2.5" />
-                    {workouts.find(w => w.intensity === 'Light')?.date?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {new Date(workouts.find(w => w.intensity === 'Light')!.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </div>
                 )}
               </th>
@@ -92,7 +55,7 @@ export function WorkoutHistory() {
                 {workouts.find(w => w.intensity === 'Medium')?.date && (
                   <div className="text-[8px] text-zinc-600 mt-1 flex items-center justify-center gap-1">
                     <Calendar className="w-2.5 h-2.5" />
-                    {workouts.find(w => w.intensity === 'Medium')?.date?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {new Date(workouts.find(w => w.intensity === 'Medium')!.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </div>
                 )}
               </th>

@@ -5,42 +5,52 @@
 
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../lib/firebase';
-import { doc, onSnapshot, setDoc, addDoc, collection, serverTimestamp, writeBatch, Timestamp, getDocs, query, where } from 'firebase/firestore';
-import { UserPlan, Intensity } from '../types';
+import { doc, onSnapshot, setDoc, addDoc, collection, serverTimestamp, writeBatch, Timestamp, query, where } from 'firebase/firestore';
+import { UserPlan, Intensity, Workout } from '../types';
 import { DEFAULT_PLAN } from '../data/defaultPlan';
 import { WorkoutHistory } from './WorkoutHistory';
 import { ProgressChart } from './ProgressChart';
-import { Plus, Database, Trash2 } from 'lucide-react';
+import { Plus, Database } from 'lucide-react';
 
 export function Dashboard() {
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null);
+  const [workouts, setWorkouts] = useState<Workout[]>(() => {
+    const cached = localStorage.getItem('workouts_cache');
+    if (cached) {
+      try { return JSON.parse(cached); } catch (e) {}
+    }
+    return [];
+  });
   const [intensity, setIntensity] = useState<Intensity>('Heavy');
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<'data' | 'progress'>('data');
-  const [lastLoggedDate, setLastLoggedDate] = useState<Date | null>(null);
 
   useEffect(() => {
     if (!auth.currentUser) return;
     const q = query(
       collection(db, 'workouts'),
-      where('userId', '==', auth.currentUser.uid),
-      where('intensity', '==', intensity)
+      where('userId', '==', auth.currentUser.uid)
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => doc.data());
-      data.sort((a, b) => {
-        const dateA = a.date?.toMillis ? a.date.toMillis() : 0;
-        const dateB = b.date?.toMillis ? b.date.toMillis() : 0;
-        return dateB - dateA;
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          ...d,
+          date: d.date?.toMillis ? d.date.toMillis() : Date.now()
+        } as Workout;
       });
-      if (data.length > 0 && data[0].date) {
-        setLastLoggedDate(data[0].date.toDate());
-      } else {
-        setLastLoggedDate(null);
-      }
+      data.sort((a, b) => b.date - a.date);
+      setWorkouts(data);
+      localStorage.setItem('workouts_cache', JSON.stringify(data));
     });
     return () => unsubscribe();
-  }, [intensity]);
+  }, []);
+
+  const lastLoggedDate = React.useMemo(() => {
+    const last = workouts.find(w => w.intensity === intensity);
+    return last ? new Date(last.date) : null;
+  }, [workouts, intensity]);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -217,27 +227,32 @@ export function Dashboard() {
                 target={target} 
                 intensity={intensity} 
                 userPlan={userPlan} 
+                workouts={workouts}
               />
             ))}
           </div>
         </div>
       ) : (
         <div className="space-y-8 mt-4">
-          <ProgressChart />
-          <WorkoutHistory />
+          <ProgressChart workouts={workouts} />
+          <WorkoutHistory workouts={workouts} />
         </div>
       )}
     </div>
   );
 }
 
-const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, userPlan: UserPlan }> = ({ exercise, target, intensity, userPlan }) => {
+const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, userPlan: UserPlan, workouts: Workout[] }> = ({ exercise, target, intensity, userPlan, workouts }) => {
   const [actualWt, setActualWt] = useState(target.weight);
   const [set1, set1Reps] = useState(target.reps.split('-')[0] || target.reps);
   const [set2, set2Reps] = useState(target.reps.split('-')[0] || target.reps);
   const [set3, set3Reps] = useState(target.reps.split('-')[0] || target.reps);
   const [isLogging, setIsLogging] = useState(false);
-  const [lastWorkoutWeight, setLastWorkoutWeight] = useState<number | null>(null);
+
+  const lastWorkoutWeight = React.useMemo(() => {
+    const last = workouts.find(w => w.exerciseName === exercise && w.intensity === intensity);
+    return last ? last.weight : null;
+  }, [workouts, exercise, intensity]);
 
   useEffect(() => {
     setActualWt(target.weight);
@@ -245,30 +260,6 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
     set2Reps(target.reps.split('-')[0] || target.reps);
     set3Reps(target.reps.split('-')[0] || target.reps);
   }, [target]);
-
-  useEffect(() => {
-    if (!auth.currentUser) return;
-    const q = query(
-      collection(db, 'workouts'),
-      where('userId', '==', auth.currentUser.uid),
-      where('exerciseName', '==', exercise),
-      where('intensity', '==', intensity)
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => doc.data());
-      data.sort((a, b) => {
-        const dateA = a.date?.toMillis ? a.date.toMillis() : 0;
-        const dateB = b.date?.toMillis ? b.date.toMillis() : 0;
-        return dateB - dateA;
-      });
-      if (data.length > 0) {
-        setLastWorkoutWeight(data[0].weight);
-      } else {
-        setLastWorkoutWeight(null);
-      }
-    });
-    return () => unsubscribe();
-  }, [exercise, intensity]);
 
   const expectedSets = target.sets || 3;
 
