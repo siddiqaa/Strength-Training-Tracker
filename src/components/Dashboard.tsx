@@ -230,13 +230,13 @@ export function Dashboard() {
           </div>
 
           <div className="mb-8 p-3 bg-zinc-950/50 border border-zinc-800/50 rounded-xl text-zinc-400 text-xs flex flex-col sm:flex-row gap-4 items-center justify-center">
-            <span className="font-bold text-zinc-300 uppercase tracking-widest text-[10px]">Target Sets & Reps:</span>
-            <div className="flex gap-3">
-               <span className="text-red-400 font-mono">Heavy: 3×6-8</span>
-               <span className="text-zinc-700">|</span>
-               <span className="text-blue-400 font-mono">Light: 2×15</span>
-               <span className="text-zinc-700">|</span>
-               <span className="text-orange-400 font-mono">Medium: 3×10-12</span>
+            <span className="font-bold text-zinc-300 uppercase tracking-widest text-[10px]">Target Sets, Reps, Rest:</span>
+            <div className="flex flex-wrap justify-center gap-3">
+               <span className="text-red-400 font-mono whitespace-nowrap">Heavy: 3×6-8 ({userPlan.dayMetadata?.Heavy?.restPeriod ?? 90}s rest)</span>
+               <span className="text-zinc-700 hidden sm:inline">|</span>
+               <span className="text-blue-400 font-mono whitespace-nowrap">Light: 2×15 ({userPlan.dayMetadata?.Light?.restPeriod ?? 90}s rest)</span>
+               <span className="text-zinc-700 hidden sm:inline">|</span>
+               <span className="text-orange-400 font-mono whitespace-nowrap">Medium: 3×10-12 ({userPlan.dayMetadata?.Medium?.restPeriod ?? 90}s rest)</span>
             </div>
           </div>
 
