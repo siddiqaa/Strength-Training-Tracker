@@ -13,12 +13,26 @@ export interface PlannedSet {
 
 export type DayPlan = Record<string, PlannedSet>;
 
+export type MuscleGroup = 'Chest' | 'Shoulders' | 'Quads' | 'Back' | 'Biceps' | 'Triceps' | 'Hamstrings/Glutes';
+export type PushPull = 'Push' | 'Pull';
+
+export interface ExerciseMetadata {
+  muscleGroup?: MuscleGroup;
+  pushPull?: PushPull;
+}
+
 export interface UserPlan {
   id?: string;
   userId: string;
   Heavy: DayPlan;
   Light: DayPlan;
   Medium: DayPlan;
+  order?: {
+    Heavy: string[];
+    Light: string[];
+    Medium: string[];
+  };
+  exerciseMetadata?: Record<string, ExerciseMetadata>;
 }
 
 export interface Workout {

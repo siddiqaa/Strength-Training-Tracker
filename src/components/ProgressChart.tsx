@@ -5,13 +5,20 @@ import { Workout } from '../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 
-export function ProgressChart({ workouts }: { workouts: Workout[] }) {
+export function ProgressChart({ workouts, userPlan }: { workouts: Workout[], userPlan?: any }) {
   const [selectedExercise, setSelectedExercise] = useState<string>('');
 
   const exercises = useMemo(() => {
-    const exList = Array.from(new Set(workouts.map(w => w.exerciseName)));
-    return exList.sort();
-  }, [workouts]);
+    const planExercises = new Set<string>();
+    if (userPlan) {
+      (['Heavy', 'Light', 'Medium'] as const).forEach(int => {
+        Object.keys(userPlan[int] || {}).forEach(ex => planExercises.add(ex));
+      });
+    }
+    const historyExercises = workouts.map(w => w.exerciseName);
+    
+    return Array.from(new Set([...historyExercises, ...planExercises])).sort();
+  }, [workouts, userPlan]);
 
   useEffect(() => {
     if (exercises.length > 0 && !selectedExercise) {
@@ -39,12 +46,41 @@ export function ProgressChart({ workouts }: { workouts: Workout[] }) {
       }
       const entry = dataByDate.get(dateStr);
       entry[w.intensity] = w.weight;
+      entry[`${w.intensity}_rpe`] = w.rpe;
     });
 
     return Array.from(dataByDate.values()).sort((a, b) => a.timestamp - b.timestamp);
   }, [workouts, selectedExercise]);
 
-  if (workouts.length === 0) return null;
+  const availableIntensities = useMemo(() => {
+    const intensities = new Set<string>();
+    chartData.forEach(d => {
+      if (d.Heavy !== undefined) intensities.add('Heavy');
+      if (d.Light !== undefined) intensities.add('Light');
+      if (d.Medium !== undefined) intensities.add('Medium');
+    });
+    return intensities;
+  }, [chartData]);
+
+  if (workouts.length === 0 && (!userPlan || Object.keys(userPlan).length === 0)) return null;
+
+  const CustomDot = (props: any) => {
+    const { cx, cy, payload, dataKey, stroke, value } = props;
+    
+    // Do not render a dot if there is no value for this intensity on this date
+    if (value === undefined || value === null) return null;
+
+    const rpe = payload[`${dataKey}_rpe`];
+    
+    let fill = '#18181b';
+    if (rpe === 'E') fill = '#22c55e'; // green-500
+    else if (rpe === 'M') fill = '#eab308'; // yellow-500
+    else if (rpe === 'H') fill = '#ef4444'; // red-500
+
+    return (
+      <circle cx={cx} cy={cy} r={5} fill={fill} stroke={stroke} strokeWidth={2} />
+    );
+  };
 
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6 sm:p-8 shadow-xl mt-8">
@@ -67,7 +103,7 @@ export function ProgressChart({ workouts }: { workouts: Workout[] }) {
       <div className="h-[300px] w-full">
         {chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+            <LineChart data={chartData} margin={{ top: 20, right: 20, bottom: 5, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
               <XAxis 
                 dataKey="date" 
@@ -91,33 +127,39 @@ export function ProgressChart({ workouts }: { workouts: Workout[] }) {
                 labelStyle={{ color: '#a1a1aa', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.25rem' }}
               />
               <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 'bold' }} />
-              <Line 
-                type="monotone" 
-                dataKey="Heavy" 
-                stroke="#ef4444" 
-                strokeWidth={3}
-                connectNulls
-                dot={{ fill: '#ef4444', strokeWidth: 2, r: 4, stroke: '#18181b' }}
-                activeDot={{ r: 6, stroke: '#ef4444', strokeWidth: 2, fill: '#18181b' }}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="Light" 
-                stroke="#3b82f6" 
-                strokeWidth={3}
-                connectNulls
-                dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4, stroke: '#18181b' }}
-                activeDot={{ r: 6, stroke: '#3b82f6', strokeWidth: 2, fill: '#18181b' }}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="Medium" 
-                stroke="#f97316" 
-                strokeWidth={3}
-                connectNulls
-                dot={{ fill: '#f97316', strokeWidth: 2, r: 4, stroke: '#18181b' }}
-                activeDot={{ r: 6, stroke: '#f97316', strokeWidth: 2, fill: '#18181b' }}
-              />
+              {availableIntensities.has('Heavy') && (
+                <Line 
+                  type="monotone" 
+                  dataKey="Heavy" 
+                  stroke="#ef4444" 
+                  strokeWidth={3}
+                  connectNulls
+                  dot={<CustomDot />}
+                  activeDot={{ r: 6, stroke: '#ef4444', strokeWidth: 2, fill: '#18181b' }}
+                />
+              )}
+              {availableIntensities.has('Light') && (
+                <Line 
+                  type="monotone" 
+                  dataKey="Light" 
+                  stroke="#3b82f6" 
+                  strokeWidth={3}
+                  connectNulls
+                  dot={<CustomDot />}
+                  activeDot={{ r: 6, stroke: '#3b82f6', strokeWidth: 2, fill: '#18181b' }}
+                />
+              )}
+              {availableIntensities.has('Medium') && (
+                <Line 
+                  type="monotone" 
+                  dataKey="Medium" 
+                  stroke="#f97316" 
+                  strokeWidth={3}
+                  connectNulls
+                  dot={<CustomDot />}
+                  activeDot={{ r: 6, stroke: '#f97316', strokeWidth: 2, fill: '#18181b' }}
+                />
+              )}
             </LineChart>
           </ResponsiveContainer>
         ) : (

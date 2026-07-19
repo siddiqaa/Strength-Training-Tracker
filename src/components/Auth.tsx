@@ -29,8 +29,6 @@ export function Auth() {
         batch.delete(doc(db, 'workouts', document.id));
       });
       
-      batch.delete(doc(db, 'userPlans', auth.currentUser.uid));
-      
       await batch.commit();
       setShowPurgeModal(false);
     } catch (error) {

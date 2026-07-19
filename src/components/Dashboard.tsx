@@ -7,10 +7,11 @@ import React, { useState, useEffect } from 'react';
 import { auth, db } from '../lib/firebase';
 import { doc, onSnapshot, setDoc, addDoc, collection, serverTimestamp, writeBatch, Timestamp, query, where } from 'firebase/firestore';
 import { UserPlan, Intensity, Workout } from '../types';
-import { DEFAULT_PLAN } from '../data/defaultPlan';
+import { PlanEditor } from './PlanEditor';
 import { WorkoutHistory } from './WorkoutHistory';
 import { ProgressChart } from './ProgressChart';
-import { Plus, Database } from 'lucide-react';
+import { JsonEditorModal } from './JsonEditorModal';
+import { Plus, Database, AlertCircle, FileJson } from 'lucide-react';
 
 export function Dashboard() {
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null);
@@ -23,7 +24,8 @@ export function Dashboard() {
   });
   const [intensity, setIntensity] = useState<Intensity>('Heavy');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [activeTab, setActiveTab] = useState<'data' | 'progress'>('data');
+  const [activeTab, setActiveTab] = useState<'data' | 'progress' | 'editor'>('data');
+  const [showJsonEditor, setShowJsonEditor] = useState(false);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -58,23 +60,24 @@ export function Dashboard() {
     const unsubscribe = onSnapshot(planRef, (docSnap) => {
       if (docSnap.exists()) {
         const rawData = docSnap.data() as UserPlan;
-        if (rawData.Heavy && rawData.Heavy['Lat Pull Down']) {
-          const resetPlan = {
-            userId: auth.currentUser!.uid,
-            Heavy: DEFAULT_PLAN.Heavy,
-            Light: DEFAULT_PLAN.Light,
-            Medium: DEFAULT_PLAN.Medium,
+        
+        // Ensure order property exists for backward compatibility
+        if (!rawData.order) {
+          rawData.order = {
+            Heavy: Object.keys(rawData.Heavy || {}),
+            Light: Object.keys(rawData.Light || {}),
+            Medium: Object.keys(rawData.Medium || {})
           };
-          setDoc(planRef, resetPlan).catch(console.error);
-          return;
         }
+        
         setUserPlan(rawData);
       } else {
         const defaultUserPlan: UserPlan = {
           userId: auth.currentUser!.uid,
-          Heavy: DEFAULT_PLAN.Heavy,
-          Light: DEFAULT_PLAN.Light,
-          Medium: DEFAULT_PLAN.Medium,
+          Heavy: {},
+          Light: {},
+          Medium: {},
+          order: { Heavy: [], Light: [], Medium: [] }
         };
         setDoc(planRef, defaultUserPlan).catch(console.error);
         setUserPlan(defaultUserPlan);
@@ -98,31 +101,48 @@ export function Dashboard() {
         ];
         
         for (const { int, dayOffset } of days) {
-          const plan = userPlan[int];
+          const plan = userPlan[int] || {};
+          const currentOrder = userPlan.order?.[int] || Object.keys(plan);
+          const allExercises = Array.from(new Set([...currentOrder, ...Object.keys(plan)]));
+          
           const date = new Date();
           // Go back 4 weeks, week 0 is oldest, week 3 is newest
           date.setDate(date.getDate() - (4 - week) * 7 + dayOffset);
           
-          for (const [exercise, targetRaw] of Object.entries(plan)) {
-            const target = targetRaw as any;
+          for (const exercise of allExercises) {
+            const target = plan[exercise] || {};
             const expectedSets = target.sets || 3;
-            const targetReps = parseInt(target.reps.split('-')[0]) || parseInt(target.reps) || 8;
+            const targetReps = parseInt(target.reps?.split('-')?.[0]) || parseInt(target.reps) || 8;
+            
+            let baseWeight = target.weight;
+            if (baseWeight === undefined || isNaN(baseWeight)) {
+               const heavyWeight = userPlan['Heavy']?.[exercise]?.weight;
+               if (heavyWeight !== undefined && !isNaN(heavyWeight)) {
+                 if (int === 'Light') baseWeight = Math.round(heavyWeight * 0.6);
+                 if (int === 'Medium') baseWeight = Math.round(heavyWeight * 0.75);
+               }
+            }
+            if (baseWeight === undefined || isNaN(baseWeight)) baseWeight = 50;
             
             // Start 7.5lb lighter 4 weeks ago, end at target weight this week
             const weightDiff = (week - 3) * 2.5; 
             
+            const rpeOptions: ('E' | 'M' | 'H')[] = ['E', 'M', 'H'];
+            const randomRpe = rpeOptions[Math.floor(Math.random() * rpeOptions.length)];
+
             const docRef = doc(collection(db, 'workouts'));
             batch.set(docRef, {
               userId,
               exerciseName: exercise,
-              weight: Math.max(0, target.weight + weightDiff),
+              weight: Math.max(0, baseWeight + weightDiff),
               set1: targetReps,
               set2: targetReps,
               ...(expectedSets >= 3 ? { set3: targetReps } : {}),
               intensity: int,
-              targetWeight: target.weight,
-              targetReps: target.reps,
+              targetWeight: target.weight !== undefined ? target.weight : baseWeight,
+              targetReps: target.reps || '8',
               targetSets: expectedSets,
+              rpe: randomRpe,
               date: Timestamp.fromDate(date),
             });
           }
@@ -160,9 +180,17 @@ export function Dashboard() {
         >
           Progress Review
         </button>
+        <button
+          onClick={() => setActiveTab('editor')}
+          className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+            activeTab === 'editor' ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-900 text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          Plan Editor
+        </button>
       </div>
 
-      {activeTab === 'data' ? (
+      {activeTab === 'data' && (
         <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-4 sm:p-6 lg:p-8 shadow-xl">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-4">
             <div className="flex flex-col gap-1">
@@ -220,23 +248,67 @@ export function Dashboard() {
               <div className="col-span-2 text-center">Action</div>
             </div>
             
-            {Object.entries(activePlan).map(([exercise, target]) => (
-              <PlanRow 
-                key={exercise} 
-                exercise={exercise} 
-                target={target} 
-                intensity={intensity} 
-                userPlan={userPlan} 
-                workouts={workouts}
-              />
-            ))}
+            {(() => {
+              const currentOrder = userPlan.order?.[intensity] || Object.keys(userPlan[intensity] || {});
+              const planExercises = Object.keys(userPlan[intensity] || {});
+              
+              // Ensure we display all exercises that are in the plan or order
+              const allExercises = Array.from(new Set([...currentOrder, ...planExercises]));
+
+              return allExercises.map((exercise) => {
+                const target = activePlan[exercise];
+                if (!target) return null;
+                return (
+                  <PlanRow 
+                    key={exercise} 
+                    exercise={exercise} 
+                    target={target} 
+                    intensity={intensity} 
+                    userPlan={userPlan} 
+                    workouts={workouts}
+                  />
+                );
+              });
+            })()}
           </div>
         </div>
-      ) : (
+      )}
+      
+      {activeTab === 'progress' && (
         <div className="space-y-8 mt-4">
-          <ProgressChart workouts={workouts} />
-          <WorkoutHistory workouts={workouts} />
+          <ProgressChart workouts={workouts} userPlan={userPlan} />
+          <WorkoutHistory workouts={workouts} userPlan={userPlan} />
         </div>
+      )}
+      
+      {activeTab === 'editor' && (
+        <div className="mt-4 relative">
+          <PlanEditor 
+            userPlan={userPlan} 
+            onRawEdit={() => setShowJsonEditor(true)}
+            onSave={async (newPlan) => {
+              if (!auth.currentUser) return;
+              const planRef = doc(db, 'userPlans', auth.currentUser.uid);
+              await setDoc(planRef, newPlan);
+              setUserPlan(newPlan);
+              setActiveTab('data');
+            }} 
+          />
+        </div>
+      )}
+
+      {showJsonEditor && (
+        <JsonEditorModal 
+          userPlan={userPlan}
+          onClose={() => setShowJsonEditor(false)}
+          onSave={async (newPlan) => {
+            if (!auth.currentUser) return;
+            const planRef = doc(db, 'userPlans', auth.currentUser.uid);
+            await setDoc(planRef, newPlan);
+            setUserPlan(newPlan);
+            setShowJsonEditor(false);
+          }}
+        />
       )}
     </div>
   );
@@ -254,6 +326,17 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
     const last = workouts.find(w => w.exerciseName === exercise && w.intensity === intensity);
     return last ? last.weight : null;
   }, [workouts, exercise, intensity]);
+
+  const isSingleDay = React.useMemo(() => {
+    let count = 0;
+    (['Heavy', 'Light', 'Medium'] as const).forEach(int => {
+      const order = userPlan.order?.[int] || Object.keys(userPlan[int] || {});
+      if (order.includes(exercise)) {
+        count++;
+      }
+    });
+    return count === 1;
+  }, [userPlan, exercise]);
 
   useEffect(() => {
     setActualWt(target.weight);
@@ -305,8 +388,9 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
   const isDiff = actualWt !== target.weight || String(set1) !== (target.reps.split('-')[0] || target.reps);
 
   let calcWeight = null;
-  if ((intensity === 'Light' || intensity === 'Medium') && userPlan['Heavy'] && userPlan['Heavy'][exercise]) {
-    const heavyPlanWeight = userPlan['Heavy'][exercise].weight;
+  const heavyPlanWeight = userPlan['Heavy']?.[exercise]?.weight;
+  
+  if ((intensity === 'Light' || intensity === 'Medium') && heavyPlanWeight !== undefined) {
     if (intensity === 'Light') {
       calcWeight = Math.round(heavyPlanWeight * 0.6);
     } else if (intensity === 'Medium') {
@@ -317,7 +401,10 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
   return (
     <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col md:grid md:grid-cols-12 gap-4 items-center hover:border-zinc-700 transition-colors">
       <div className="flex items-center justify-between w-full md:contents">
-        <div className="md:col-span-3 w-full font-bold text-white text-base md:text-sm truncate" title={exercise}>{exercise}</div>
+        <div className="md:col-span-3 w-full font-bold text-white text-base md:text-sm truncate flex items-center gap-2">
+          <span className="truncate" title={exercise}>{exercise}</span>
+          {isSingleDay && <span title="One Day a Week Only" className="flex items-center"><AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" /></span>}
+        </div>
         
         <div className="md:col-span-2 flex items-center justify-center font-mono text-sm bg-zinc-900/80 py-1.5 md:py-2 px-3 rounded-xl border border-zinc-800">
           <span className="text-white" title="Plan">{target.weight}</span>
@@ -332,27 +419,19 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
         </div>
       </div>
       
-      <div className="md:col-span-5 w-full flex flex-col md:flex-row gap-3 md:gap-1 justify-center items-center bg-zinc-900/40 md:bg-transparent p-3 md:p-0 rounded-xl md:rounded-none">
-        <div className="flex items-center justify-between w-full md:w-auto gap-2">
-          <span className="text-zinc-500 text-[10px] font-mono uppercase tracking-widest md:hidden">Weight</span>
-          <div className="flex items-center gap-1.5 md:gap-0">
-            <input type="number" step="any" value={actualWt} onChange={e => setActualWt(Number(e.target.value))} className="w-20 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 md:py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm md:text-sm" title="Actual Weight (lb)" />
-            <span className="text-zinc-500 font-mono text-xs md:hidden">lb</span>
-          </div>
-        </div>
+      <div className="md:col-span-5 w-full flex flex-row gap-2 md:gap-1 justify-between md:justify-center items-center bg-zinc-900/40 md:bg-transparent p-3 md:p-0 rounded-xl md:rounded-none">
+        <input type="number" step="any" value={actualWt} onChange={e => setActualWt(Number(e.target.value))} className="w-16 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Actual Weight (lb)" />
         
         <span className="text-zinc-600 font-black px-1 hidden md:flex items-center">|</span>
         
-        <div className="flex items-center justify-between w-full md:w-auto gap-2">
-          <span className="text-zinc-500 text-[10px] font-mono uppercase tracking-widest md:hidden">Reps / RPE</span>
-          <div className="flex items-center gap-1.5 md:gap-2">
-            <div className="flex gap-1.5 md:gap-1">
-              <input type="number" value={set1} onChange={e => set1Reps(Number(e.target.value))} className="w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 1 Reps" />
-              <input type="number" value={set2} onChange={e => set2Reps(Number(e.target.value))} className="w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 2 Reps" />
-              {expectedSets >= 3 && (
-                <input type="number" value={set3} onChange={e => set3Reps(Number(e.target.value))} className="w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 3 Reps" />
-              )}
-            </div>
+        <div className="flex items-center gap-1.5 md:gap-2">
+          <div className="flex gap-1.5 md:gap-1">
+            <input type="number" value={set1} onChange={e => set1Reps(Number(e.target.value))} className="w-12 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 1 Reps" />
+            <input type="number" value={set2} onChange={e => set2Reps(Number(e.target.value))} className="w-12 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 2 Reps" />
+            {expectedSets >= 3 && (
+              <input type="number" value={set3} onChange={e => set3Reps(Number(e.target.value))} className="w-12 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 3 Reps" />
+            )}
+          </div>
             
             <div className="flex items-center p-0.5 bg-zinc-950 md:bg-zinc-900 rounded-lg border border-zinc-700 ml-1 md:ml-0">
               {(['E', 'M', 'H'] as const).map(level => (
@@ -371,7 +450,6 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
               ))}
             </div>
           </div>
-        </div>
       </div>
       
       <div className="md:col-span-2 w-full flex flex-row md:flex-col gap-2">

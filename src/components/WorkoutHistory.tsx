@@ -8,8 +8,8 @@ import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestor
 import { Workout, OperationType } from '../types';
 import { History, Calendar } from 'lucide-react';
 
-export function WorkoutHistory({ workouts }: { workouts: Workout[] }) {
-  if (workouts.length === 0) {
+export function WorkoutHistory({ workouts, userPlan }: { workouts: Workout[], userPlan?: any }) {
+  if (workouts.length === 0 && (!userPlan || Object.keys(userPlan).length === 0)) {
     return (
       <div className="text-center py-12 bg-zinc-900/50 rounded-2xl border border-dashed border-zinc-800">
         <History className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
@@ -18,7 +18,16 @@ export function WorkoutHistory({ workouts }: { workouts: Workout[] }) {
     );
   }
 
-  const exercises = Array.from(new Set(workouts.map(w => w.exerciseName))).sort();
+  // Combine exercises from history and from the current plan
+  const planExercises = new Set<string>();
+  if (userPlan) {
+    (['Heavy', 'Light', 'Medium'] as const).forEach(int => {
+      Object.keys(userPlan[int] || {}).forEach(ex => planExercises.add(ex));
+    });
+  }
+  const historyExercises = workouts.map(w => w.exerciseName);
+  
+  const exercises = Array.from(new Set([...historyExercises, ...planExercises])).sort();
 
   return (
     <div className="space-y-6 mt-8">
@@ -92,10 +101,15 @@ export function WorkoutHistory({ workouts }: { workouts: Workout[] }) {
 function TableCell({ workout }: { workout?: Workout }) {
   if (!workout) return <div className="text-zinc-700 text-xs font-mono text-center py-2">-</div>;
 
+  let weightColor = 'text-white';
+  if (workout.rpe === 'E') weightColor = 'text-green-500';
+  else if (workout.rpe === 'M') weightColor = 'text-yellow-500';
+  else if (workout.rpe === 'H') weightColor = 'text-red-500';
+
   return (
     <div className="flex flex-col items-center justify-center gap-0.5 py-1.5 px-1 text-xs font-mono whitespace-nowrap">
-      <div className="flex items-center gap-1.5 font-black text-white">
-        <span>
+      <div className="flex items-center gap-1.5 font-black">
+        <span className={weightColor}>
           {workout.weight} <span className="text-zinc-500 font-normal">lb</span>
         </span>
         <span className="text-zinc-700">|</span>
@@ -103,17 +117,6 @@ function TableCell({ workout }: { workout?: Workout }) {
           {workout.set1}/{workout.set2}{workout.set3 !== undefined && workout.set3 !== null ? `/${workout.set3}` : ''}
         </span>
       </div>
-      {workout.rpe && (
-        <div className="flex items-center">
-          <span className={`text-[9px] px-1.5 rounded-sm ${
-            workout.rpe === 'E' ? 'bg-blue-500/20 text-blue-400' :
-            workout.rpe === 'M' ? 'bg-orange-500/20 text-orange-400' :
-            'bg-red-500/20 text-red-400'
-          }`}>
-            RPE: {workout.rpe}
-          </span>
-        </div>
-      )}
     </div>
   );
 }
