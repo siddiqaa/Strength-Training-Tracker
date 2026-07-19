@@ -124,8 +124,10 @@ export function Dashboard() {
             }
             if (baseWeight === undefined || isNaN(baseWeight)) baseWeight = 50;
             
-            // Start 7.5lb lighter 4 weeks ago, end at target weight this week
-            const weightDiff = (week - 3) * 2.5; 
+            // Start 7.5 lighter 4 weeks ago, end at target weight this week.
+            // Randomly force stagnation for some exercise-intensity pairs to test the UI indicator
+            const isStagnantPair = (exercise.charCodeAt(0) + int.charCodeAt(0)) % 3 === 0;
+            const weightDiff = isStagnantPair ? -5 : (week - 3) * 2.5; 
             
             const rpeOptions: ('E' | 'M' | 'H')[] = ['E', 'M', 'H'];
             const randomRpe = rpeOptions[Math.floor(Math.random() * rpeOptions.length)];
@@ -419,9 +421,19 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
   return (
     <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col md:grid md:grid-cols-12 gap-4 items-center hover:border-zinc-700 transition-colors">
       <div className="flex items-center justify-between w-full md:contents">
-        <div className="md:col-span-3 w-full font-bold text-white text-base md:text-sm truncate flex items-center gap-2">
-          <span className="truncate" title={exercise}>{exercise}</span>
-          {isSingleDay && <span title="One Day a Week Only" className="flex items-center"><AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" /></span>}
+        <div className="md:col-span-3 w-full font-bold text-white text-base md:text-sm flex flex-col">
+          <div className="flex items-center gap-2 truncate">
+            <span className="truncate" title={exercise}>{exercise}</span>
+            {isSingleDay && <span title="One Day a Week Only" className="flex items-center"><AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" /></span>}
+          </div>
+          {/* Desktop Notes: Keep them under title for grid clarity */}
+          {userPlan.exerciseMetadata?.[exercise]?.notes && (
+            <div className="hidden md:block mt-1">
+              <p className="text-[10px] text-zinc-500 font-medium leading-tight italic line-clamp-2">
+                {userPlan.exerciseMetadata[exercise].notes}
+              </p>
+            </div>
+          )}
         </div>
         
         <div className="md:col-span-2 flex items-center justify-center font-mono text-sm bg-zinc-900/80 py-1.5 md:py-2 px-3 rounded-xl border border-zinc-800">
@@ -438,7 +450,7 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
       </div>
       
       <div className="md:col-span-5 w-full flex flex-row gap-2 md:gap-1 justify-between md:justify-center items-center bg-zinc-900/40 md:bg-transparent p-3 md:p-0 rounded-xl md:rounded-none">
-        <input type="number" step="any" value={actualWt} onChange={e => setActualWt(Number(e.target.value))} className="w-16 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Actual Weight (lb)" />
+        <input type="number" step="any" value={actualWt} onChange={e => setActualWt(Number(e.target.value))} className="w-16 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Actual Weight" />
         
         <span className="text-zinc-600 font-black px-1 hidden md:flex items-center">|</span>
         
@@ -458,7 +470,7 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
                   onClick={() => setRpe(level)}
                   className={`w-[26px] h-[34px] md:w-6 md:h-8 rounded md:rounded-md text-[10px] font-black transition-colors flex items-center justify-center ${
                     rpe === level 
-                      ? level === 'E' ? 'bg-blue-500 text-white' : level === 'M' ? 'bg-orange-500 text-white' : 'bg-red-500 text-white'
+                      ? level === 'E' ? 'bg-green-500 text-white' : level === 'M' ? 'bg-yellow-500 text-black' : 'bg-red-500 text-white'
                       : 'text-zinc-500 hover:text-white hover:bg-zinc-800'
                   }`}
                   title={`RPE ${level === 'E' ? 'Easy' : level === 'M' ? 'Medium' : 'Hard'}`}
@@ -470,15 +482,25 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
           </div>
       </div>
       
-      <div className="md:col-span-2 w-full flex flex-row md:flex-col gap-2">
-        <button onClick={handleLog} disabled={isLogging} className="flex-1 bg-white text-black text-[10px] font-black uppercase tracking-widest py-3 md:py-2.5 rounded-xl hover:bg-orange-500 hover:text-white transition-colors flex justify-center items-center gap-1 active:scale-95 disabled:opacity-50">
-          {isLogging ? '...' : <><Plus className="w-3 h-3"/> Log</>}
-        </button>
-        {isDiff && (
-          <button onClick={handleSaveTarget} className="flex-1 bg-zinc-800 text-blue-400 text-[10px] font-black uppercase tracking-widest py-3 md:py-1.5 rounded-xl md:rounded-lg hover:bg-blue-500 hover:text-white transition-colors border border-zinc-700 hover:border-blue-500 active:scale-95">
-            Update Plan
-          </button>
+      <div className="md:col-span-2 w-full flex flex-col gap-2">
+        {/* Mobile Notes: Full width above button */}
+        {userPlan.exerciseMetadata?.[exercise]?.notes && (
+          <div className="md:hidden p-2.5 bg-orange-500/5 border-l-2 border-orange-500/20 rounded-r-xl mb-1">
+            <p className="text-[11px] text-zinc-300 font-medium leading-relaxed italic whitespace-pre-wrap">
+              {userPlan.exerciseMetadata[exercise].notes}
+            </p>
+          </div>
         )}
+        <div className="flex flex-row md:flex-col gap-2">
+          <button onClick={handleLog} disabled={isLogging} className="flex-1 bg-white text-black text-[10px] font-black uppercase tracking-widest py-3 md:py-2.5 rounded-xl hover:bg-orange-500 hover:text-white transition-colors flex justify-center items-center gap-1 active:scale-95 disabled:opacity-50">
+            {isLogging ? '...' : <><Plus className="w-3 h-3"/> Log</>}
+          </button>
+          {isDiff && (
+            <button onClick={handleSaveTarget} className="flex-1 bg-zinc-800 text-blue-400 text-[10px] font-black uppercase tracking-widest py-3 md:py-1.5 rounded-xl md:rounded-lg hover:bg-blue-500 hover:text-white transition-colors border border-zinc-700 hover:border-blue-500 active:scale-95">
+              Update Plan
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

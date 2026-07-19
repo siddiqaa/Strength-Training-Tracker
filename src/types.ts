@@ -19,6 +19,7 @@ export type PushPull = 'Push' | 'Pull';
 export interface ExerciseMetadata {
   muscleGroup?: MuscleGroup;
   pushPull?: PushPull;
+  notes?: string;
 }
 
 export interface DayMetadata {
