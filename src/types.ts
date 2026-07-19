@@ -21,6 +21,10 @@ export interface ExerciseMetadata {
   pushPull?: PushPull;
 }
 
+export interface DayMetadata {
+  restPeriod?: number;
+}
+
 export interface UserPlan {
   id?: string;
   userId: string;
@@ -33,6 +37,11 @@ export interface UserPlan {
     Medium: string[];
   };
   exerciseMetadata?: Record<string, ExerciseMetadata>;
+  dayMetadata?: {
+    Heavy?: DayMetadata;
+    Light?: DayMetadata;
+    Medium?: DayMetadata;
+  };
 }
 
 export interface Workout {

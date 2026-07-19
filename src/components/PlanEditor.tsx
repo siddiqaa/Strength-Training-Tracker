@@ -8,9 +8,10 @@ interface PlanEditorProps {
   userPlan: UserPlan;
   onSave: (newPlan: UserPlan) => Promise<void>;
   onRawEdit?: () => void;
+  onDeleteExercise?: (exercise: string) => Promise<void>;
 }
 
-export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onRawEdit }) => {
+export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onRawEdit, onDeleteExercise }) => {
   const [editedPlan, setEditedPlan] = useState<UserPlan>(userPlan);
   const [newExercise, setNewExercise] = useState('');
   const [error, setError] = useState('');
@@ -57,6 +58,19 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onRawE
     }));
   };
 
+  const updateDayMetadata = (intensity: Intensity, field: 'restPeriod', value: string) => {
+    setEditedPlan(prev => ({
+      ...prev,
+      dayMetadata: {
+        ...prev.dayMetadata,
+        [intensity]: {
+          ...(prev.dayMetadata?.[intensity] || {}),
+          [field]: Number(value)
+        }
+      }
+    }));
+  };
+
   const updateMetadata = (exercise: string, field: 'muscleGroup' | 'pushPull', value: string) => {
     setEditedPlan(prev => ({
       ...prev,
@@ -70,13 +84,32 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onRawE
     }));
   };
 
-  const removeGlobalExercise = (exercise: string) => {
+  const removeGlobalExercise = async (exercise: string) => {
+    if (!window.confirm(`Are you sure you want to delete "${exercise}"?\n\nThis will remove it from your plan AND permanently delete all workout logs for this exercise.`)) {
+      return;
+    }
+
+    if (onDeleteExercise) {
+      await onDeleteExercise(exercise);
+    }
+
     const newPlan = { ...editedPlan };
     (['Heavy', 'Light', 'Medium'] as Intensity[]).forEach(int => {
        const dayPlan = { ...newPlan[int] };
        delete dayPlan[exercise];
        newPlan[int] = dayPlan;
     });
+    
+    // Also remove from order and metadata
+    (['Heavy', 'Light', 'Medium'] as Intensity[]).forEach(int => {
+      if (newPlan.order?.[int]) {
+        newPlan.order[int] = newPlan.order[int].filter(ex => ex !== exercise);
+      }
+    });
+    if (newPlan.exerciseMetadata?.[exercise]) {
+      delete newPlan.exerciseMetadata[exercise];
+    }
+
     setEditedPlan(newPlan);
     setExercises(exercises.filter(e => e !== exercise));
   };
@@ -111,6 +144,20 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onRawE
       Light: exercises.filter(ex => !!finalPlan.Light[ex]),
       Medium: exercises.filter(ex => !!finalPlan.Medium[ex]),
     };
+    
+    // Ensure dayMetadata is populated with defaults before saving
+    if (!finalPlan.dayMetadata) {
+      finalPlan.dayMetadata = {};
+    }
+    (['Heavy', 'Light', 'Medium'] as Intensity[]).forEach(int => {
+      if (!finalPlan.dayMetadata![int]) {
+        finalPlan.dayMetadata![int] = {};
+      }
+      if (finalPlan.dayMetadata![int]!.restPeriod === undefined) {
+        finalPlan.dayMetadata![int]!.restPeriod = 90;
+      }
+    });
+
     onSave(finalPlan);
   };
 
@@ -141,9 +188,18 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onRawE
       ];
     });
 
+    const heavyRest = editedPlan.dayMetadata?.Heavy?.restPeriod ?? 90;
+    const lightRest = editedPlan.dayMetadata?.Light?.restPeriod ?? 90;
+    const mediumRest = editedPlan.dayMetadata?.Medium?.restPeriod ?? 90;
+
     autoTable(doc, {
       startY: 38,
-      head: [['Exercise', 'Day 1 (Heavy)', 'Day 2 (Light)', 'Day 3 (Medium)']],
+      head: [[
+        'Exercise', 
+        `Day 1 (Heavy)\nRest: ${heavyRest}s`, 
+        `Day 2 (Light)\nRest: ${lightRest}s`, 
+        `Day 3 (Medium)\nRest: ${mediumRest}s`
+      ]],
       body: planRows,
       theme: 'grid',
       headStyles: { fillColor: [40, 40, 40] },
@@ -300,10 +356,24 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onRawE
           <thead>
             <tr className="bg-zinc-900 border-b border-zinc-800 text-xs font-black uppercase tracking-widest text-zinc-500">
               <th className="p-4 w-1/4">Exercise</th>
-              <th className="p-4 w-1/5">Heavy Day</th>
-              <th className="p-4 w-1/5">Light Day</th>
-              <th className="p-4 w-1/5">Medium Day</th>
-              <th className="p-4 w-[120px] text-right">Actions</th>
+              {(['Heavy', 'Light', 'Medium'] as Intensity[]).map(intensity => (
+                <th key={intensity} className="p-4 w-1/5">
+                  <div className="flex flex-col gap-2">
+                    <span>{intensity} Day</span>
+                    <div className="flex items-center gap-1 text-[10px] bg-zinc-950 border border-zinc-800 rounded px-2 py-1 w-max">
+                      <span className="text-zinc-600">Rest:</span>
+                      <input 
+                        type="number" 
+                        value={editedPlan.dayMetadata?.[intensity]?.restPeriod ?? 90}
+                        onChange={(e) => updateDayMetadata(intensity, 'restPeriod', e.target.value)}
+                        className="w-10 bg-transparent text-white border-none p-0 text-center focus:outline-none"
+                      />
+                      <span className="text-zinc-600">sec</span>
+                    </div>
+                  </div>
+                </th>
+              ))}
+              <th className="p-4 w-[120px] text-right align-top">Actions</th>
             </tr>
           </thead>
           <tbody>

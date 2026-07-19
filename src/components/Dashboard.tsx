@@ -286,6 +286,24 @@ export function Dashboard() {
           <PlanEditor 
             userPlan={userPlan} 
             onRawEdit={() => setShowJsonEditor(true)}
+            onDeleteExercise={async (exercise: string) => {
+              if (!auth.currentUser) return;
+              const workoutsToDelete = workouts.filter(w => w.exerciseName === exercise);
+              if (workoutsToDelete.length > 0) {
+                const batch = writeBatch(db);
+                let count = 0;
+                for (const w of workoutsToDelete) {
+                  if (w.id) {
+                    batch.delete(doc(db, 'workouts', w.id));
+                    count++;
+                  }
+                  if (count === 500) break; // limit to one batch
+                }
+                if (count > 0) {
+                  await batch.commit();
+                }
+              }
+            }}
             onSave={async (newPlan) => {
               if (!auth.currentUser) return;
               const planRef = doc(db, 'userPlans', auth.currentUser.uid);
