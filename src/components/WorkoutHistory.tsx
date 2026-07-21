@@ -9,7 +9,7 @@ import { Workout, OperationType } from '../types';
 import { History, Calendar } from 'lucide-react';
 
 export function WorkoutHistory({ workouts, userPlan }: { workouts: Workout[], userPlan?: any }) {
-  const [stagnationThreshold, setStagnationThreshold] = useState(3);
+  const [stagnationThreshold, setStagnationThreshold] = useState(2);
 
   if (workouts.length === 0 && (!userPlan || Object.keys(userPlan).length === 0)) {
     return (

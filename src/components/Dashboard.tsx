@@ -4,12 +4,13 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { auth, db } from '../lib/firebase';
+import { auth, db, handleFirestoreError } from '../lib/firebase';
 import { doc, onSnapshot, setDoc, addDoc, collection, serverTimestamp, writeBatch, Timestamp, query, where } from 'firebase/firestore';
-import { UserPlan, Intensity, Workout } from '../types';
+import { UserPlan, Intensity, Workout, OperationType } from '../types';
 import { PlanEditor } from './PlanEditor';
 import { WorkoutHistory } from './WorkoutHistory';
 import { ProgressChart } from './ProgressChart';
+import { LogManager } from './LogManager';
 import { JsonEditorModal } from './JsonEditorModal';
 import { Plus, Database, AlertCircle, FileJson } from 'lucide-react';
 
@@ -24,7 +25,7 @@ export function Dashboard() {
   });
   const [intensity, setIntensity] = useState<Intensity>('Heavy');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [activeTab, setActiveTab] = useState<'data' | 'progress' | 'editor'>('data');
+  const [activeTab, setActiveTab] = useState<'data' | 'progress' | 'editor' | 'logs'>('data');
   const [showJsonEditor, setShowJsonEditor] = useState(false);
 
   useEffect(() => {
@@ -45,6 +46,8 @@ export function Dashboard() {
       data.sort((a, b) => b.date - a.date);
       setWorkouts(data);
       localStorage.setItem('workouts_cache', JSON.stringify(data));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'workouts');
     });
     return () => unsubscribe();
   }, []);
@@ -79,9 +82,11 @@ export function Dashboard() {
           Medium: {},
           order: { Heavy: [], Light: [], Medium: [] }
         };
-        setDoc(planRef, defaultUserPlan).catch(console.error);
+        setDoc(planRef, defaultUserPlan).catch(error => handleFirestoreError(error, OperationType.WRITE, `userPlans/${auth.currentUser?.uid}`));
         setUserPlan(defaultUserPlan);
       }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, `userPlans/${auth.currentUser?.uid}`);
     });
     return () => unsubscribe();
   }, []);
@@ -152,8 +157,8 @@ export function Dashboard() {
       }
       
       await batch.commit();
-    } catch (err) {
-      console.error('Failed to generate sample data', err);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'batch-seed');
     } finally {
       setIsGenerating(false);
     }
@@ -189,6 +194,14 @@ export function Dashboard() {
           }`}
         >
           Plan Editor
+        </button>
+        <button
+          onClick={() => setActiveTab('logs')}
+          className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+            activeTab === 'logs' ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-900 text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          Logs
         </button>
       </div>
 
@@ -302,18 +315,33 @@ export function Dashboard() {
                   if (count === 500) break; // limit to one batch
                 }
                 if (count > 0) {
-                  await batch.commit();
+                  try {
+                    await batch.commit();
+                  } catch (error) {
+                    handleFirestoreError(error, OperationType.WRITE, 'batch-delete-exercise');
+                  }
                 }
               }
             }}
             onSave={async (newPlan) => {
               if (!auth.currentUser) return;
-              const planRef = doc(db, 'userPlans', auth.currentUser.uid);
-              await setDoc(planRef, newPlan);
-              setUserPlan(newPlan);
-              setActiveTab('data');
+              const path = `userPlans/${auth.currentUser.uid}`;
+              try {
+                const planRef = doc(db, 'userPlans', auth.currentUser.uid);
+                await setDoc(planRef, newPlan);
+                setUserPlan(newPlan);
+                setActiveTab('data');
+              } catch (error) {
+                handleFirestoreError(error, OperationType.WRITE, path);
+              }
             }} 
           />
+        </div>
+      )}
+
+      {activeTab === 'logs' && (
+        <div className="mt-4">
+          <LogManager workouts={workouts} />
         </div>
       )}
 
@@ -323,10 +351,15 @@ export function Dashboard() {
           onClose={() => setShowJsonEditor(false)}
           onSave={async (newPlan) => {
             if (!auth.currentUser) return;
-            const planRef = doc(db, 'userPlans', auth.currentUser.uid);
-            await setDoc(planRef, newPlan);
-            setUserPlan(newPlan);
-            setShowJsonEditor(false);
+            const path = `userPlans/${auth.currentUser.uid}`;
+            try {
+              const planRef = doc(db, 'userPlans', auth.currentUser.uid);
+              await setDoc(planRef, newPlan);
+              setUserPlan(newPlan);
+              setShowJsonEditor(false);
+            } catch (error) {
+              handleFirestoreError(error, OperationType.WRITE, path);
+            }
           }}
         />
       )}
@@ -372,7 +405,20 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
     if (!auth.currentUser) return;
     setIsLogging(true);
     try {
-      await addDoc(collection(db, 'workouts'), {
+      // Find if an entry already exists for this exercise on this calendar date
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const existingWorkout = workouts.find(w => {
+        const wDate = new Date(w.date);
+        return w.exerciseName === exercise && 
+               wDate >= today && 
+               wDate < tomorrow;
+      });
+
+      const workoutData = {
         userId: auth.currentUser.uid,
         exerciseName: exercise,
         weight: Number(actualWt),
@@ -385,9 +431,15 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
         targetSets: expectedSets,
         rpe,
         date: serverTimestamp(),
-      });
-    } catch (err) {
-      console.error(err);
+      };
+
+      if (existingWorkout?.id) {
+        await setDoc(doc(db, 'workouts', existingWorkout.id), workoutData);
+      } else {
+        await addDoc(collection(db, 'workouts'), workoutData);
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'workouts');
     } finally {
       setIsLogging(false);
     }
@@ -395,14 +447,19 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
   
   const handleSaveTarget = async () => {
      if (!auth.currentUser) return;
-     const planRef = doc(db, 'userPlans', auth.currentUser.uid);
-     const updated = { ...userPlan };
-     updated[intensity][exercise] = {
-       weight: Number(actualWt),
-       sets: expectedSets,
-       reps: String(set1),
-     };
-     await setDoc(planRef, updated);
+     const path = `userPlans/${auth.currentUser.uid}`;
+     try {
+       const planRef = doc(db, 'userPlans', auth.currentUser.uid);
+       const updated = { ...userPlan };
+       updated[intensity][exercise] = {
+         weight: Number(actualWt),
+         sets: expectedSets,
+         reps: String(set1),
+       };
+       await setDoc(planRef, updated);
+     } catch (error) {
+       handleFirestoreError(error, OperationType.WRITE, path);
+     }
   }
 
   const isDiff = actualWt !== target.weight || String(set1) !== (target.reps.split('-')[0] || target.reps);
