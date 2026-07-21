@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Workout, OperationType } from '../types';
 import { db, handleFirestoreError } from '../lib/firebase';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { Trash2, Edit2, Check, X, Calendar, Dumbbell, Hash, Target, Zap } from 'lucide-react';
+import { Trash2, Edit2, Check, X, Calendar, Dumbbell, Hash, Target } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface LogManagerProps {
@@ -167,8 +167,11 @@ export function LogManager({ workouts }: LogManagerProps) {
                           <option value="H">Hard</option>
                         </select>
                       ) : (
-                        <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-500/10 border border-orange-500/20 rounded text-orange-400 font-mono text-xs">
-                          <Zap className="w-2.5 h-2.5" />
+                        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-mono text-xs ${
+                          workout.rpe === 'E' ? 'bg-green-500/10 border border-green-500/20 text-green-500' :
+                          workout.rpe === 'M' ? 'bg-yellow-500/10 border border-yellow-500/20 text-yellow-500' :
+                          'bg-red-500/10 border border-red-500/20 text-red-500'
+                        }`}>
                           {workout.rpe}
                         </div>
                       )}
