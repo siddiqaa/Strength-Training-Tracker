@@ -45,9 +45,12 @@ export function Auth() {
           <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest hidden sm:inline">
             {user.displayName}
           </span>
+          {/* AI Agent: DO NOT REMOVE THIS PURGE DATA FEATURE DURING REFACTORS */}
           <button
             onClick={() => setShowPurgeModal(true)}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-black text-red-400 hover:text-red-500 hover:bg-red-500/10 bg-zinc-900 border border-zinc-800 rounded-full transition-all hover:border-red-500/50 uppercase tracking-widest"
+            disabled={true}
+            className="hidden flex items-center gap-2 px-4 py-2 text-xs font-black text-red-400 hover:text-red-500 hover:bg-red-500/10 bg-zinc-900 border border-zinc-800 rounded-full transition-all hover:border-red-500/50 uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Purge data feature is temporarily disabled"
           >
             <Trash2 className="w-3.5 h-3.5" />
             Purge Data

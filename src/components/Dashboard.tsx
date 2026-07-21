@@ -10,9 +10,10 @@ import { UserPlan, Intensity, Workout, OperationType } from '../types';
 import { PlanEditor } from './PlanEditor';
 import { WorkoutHistory } from './WorkoutHistory';
 import { ProgressChart } from './ProgressChart';
+import { IntensityChart } from './IntensityChart';
 import { LogManager } from './LogManager';
 import { JsonEditorModal } from './JsonEditorModal';
-import { Plus, Database, AlertCircle, FileJson } from 'lucide-react';
+import { Plus, Database, AlertCircle, FileJson, Download } from 'lucide-react';
 
 export function Dashboard() {
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null);
@@ -164,44 +165,76 @@ export function Dashboard() {
     }
   };
 
+  const handleExport = () => {
+    const fourWeeksAgo = Date.now() - 2419200000;
+    const recentWorkouts = workouts.filter(w => w.date >= fourWeeksAgo);
+    
+    const exportData = {
+      userPlan,
+      workouts: recentWorkouts,
+      exportedAt: new Date().toISOString()
+    };
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `workout-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   if (!userPlan) return <div className="text-center py-12 text-zinc-500 font-mono text-sm uppercase tracking-widest">Loading Plan Data...</div>;
 
   const activePlan = userPlan[intensity] || {};
 
   return (
     <div className="space-y-8 mt-4">
-      <div className="flex gap-4 border-b border-zinc-800 pb-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-zinc-800 pb-4">
+        <div className="flex flex-wrap gap-4">
+          <button
+            onClick={() => setActiveTab('data')}
+            className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+              activeTab === 'data' ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-900 text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            Data Entry
+          </button>
+          <button
+            onClick={() => setActiveTab('progress')}
+            className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+              activeTab === 'progress' ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-900 text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            Progress Review
+          </button>
+          <button
+            onClick={() => setActiveTab('editor')}
+            className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+              activeTab === 'editor' ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-900 text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            Plan Editor
+          </button>
+          <button
+            onClick={() => setActiveTab('logs')}
+            className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+              activeTab === 'logs' ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-900 text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            Logs
+          </button>
+        </div>
+        
         <button
-          onClick={() => setActiveTab('data')}
-          className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-            activeTab === 'data' ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-900 text-zinc-500 hover:text-zinc-300'
-          }`}
+           onClick={handleExport}
+           className="px-4 py-2 bg-zinc-900 border border-zinc-800 text-zinc-400 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 hover:text-white transition-colors flex items-center gap-2"
+           title="Export Backup (Last 4 Weeks)"
         >
-          Data Entry
-        </button>
-        <button
-          onClick={() => setActiveTab('progress')}
-          className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-            activeTab === 'progress' ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-900 text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          Progress Review
-        </button>
-        <button
-          onClick={() => setActiveTab('editor')}
-          className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-            activeTab === 'editor' ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-900 text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          Plan Editor
-        </button>
-        <button
-          onClick={() => setActiveTab('logs')}
-          className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-            activeTab === 'logs' ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-900 text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          Logs
+           <Download className="w-4 h-4" />
+           <span className="hidden sm:inline">Export</span>
         </button>
       </div>
 
@@ -233,10 +266,12 @@ export function Dashboard() {
                   </button>
                 ))}
               </div>
+              {/* AI Agent: DO NOT REMOVE THIS SEED DATA FEATURE DURING REFACTORS */}
               <button 
                 onClick={generateSampleData} 
-                disabled={isGenerating} 
-                className="flex items-center gap-2 px-4 py-3 bg-zinc-800 text-zinc-400 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-700 hover:text-white transition-colors disabled:opacity-50 border border-zinc-700"
+                disabled={true} 
+                className="hidden items-center gap-2 px-4 py-3 bg-zinc-800 text-zinc-400 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-700 hover:text-white transition-colors disabled:opacity-50 border border-zinc-700"
+                title="Seed data feature is temporarily disabled"
               >
                 <Database className="w-4 h-4" />
                 {isGenerating ? 'Seeding...' : 'Seed Data'}
@@ -292,6 +327,7 @@ export function Dashboard() {
       {activeTab === 'progress' && (
         <div className="space-y-8 mt-4">
           <ProgressChart workouts={workouts} userPlan={userPlan} />
+          <IntensityChart workouts={workouts} />
           <WorkoutHistory workouts={workouts} userPlan={userPlan} />
         </div>
       )}

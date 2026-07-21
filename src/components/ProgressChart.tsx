@@ -125,6 +125,7 @@ export function ProgressChart({ workouts, userPlan }: { workouts: Workout[], use
                 contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '0.75rem' }}
                 itemStyle={{ fontWeight: 900, fontFamily: 'monospace' }}
                 labelStyle={{ color: '#a1a1aa', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.25rem' }}
+                wrapperStyle={{ zIndex: 1000 }}
               />
               <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 'bold' }} />
               {availableIntensities.has('Heavy') && (
