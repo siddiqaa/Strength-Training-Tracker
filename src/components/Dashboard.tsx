@@ -360,7 +360,7 @@ export function Dashboard() {
       {activeTab === 'progress' && (
         <div className="space-y-8 mt-4">
           <ProgressChart workouts={workouts} userPlan={userPlan} />
-          <IntensityChart workouts={workouts} />
+          <IntensityChart workouts={workouts} userPlan={userPlan} />
           <WorkoutHistory workouts={workouts} userPlan={userPlan} />
         </div>
       )}

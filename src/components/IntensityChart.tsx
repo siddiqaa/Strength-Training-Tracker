@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { Workout, Intensity } from '../types';
+import { getOrderedExerciseNames } from '../lib/workoutUtils';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Activity } from 'lucide-react';
 
-export function IntensityChart({ workouts }: { workouts: Workout[] }) {
+export function IntensityChart({ workouts, userPlan }: { workouts: Workout[], userPlan?: any }) {
   const [selectedIntensity, setSelectedIntensity] = useState<Intensity>('Heavy');
 
   const chartData = useMemo(() => {
@@ -41,8 +42,17 @@ export function IntensityChart({ workouts }: { workouts: Workout[] }) {
         }
       });
     });
+    
+    if (userPlan) {
+      const orderedNames = getOrderedExerciseNames(
+        userPlan.exerciseOrder || userPlan.globalOrder,
+        Array.from(exercises)
+      );
+      return orderedNames.filter(ex => exercises.has(ex));
+    }
+
     return Array.from(exercises).sort();
-  }, [chartData]);
+  }, [chartData, userPlan]);
 
   if (workouts.length === 0) return null;
 
