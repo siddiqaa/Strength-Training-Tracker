@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { db, auth, handleFirestoreError } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { Workout, OperationType } from '../types';
+import { getOrderedExerciseNames } from '../lib/workoutUtils';
 import { History, Calendar } from 'lucide-react';
 
 export function WorkoutHistory({ workouts, userPlan }: { workouts: Workout[], userPlan?: any }) {
@@ -21,16 +22,16 @@ export function WorkoutHistory({ workouts, userPlan }: { workouts: Workout[], us
   }
 
   // Combine exercises from history and from the current plan, keeping the plan's custom order
-  const planExercisesList: string[] = [];
+  let planExercisesList: string[] = [];
   if (userPlan) {
-    const savedOrder = userPlan.globalOrder && userPlan.globalOrder.length > 0 ? [...userPlan.globalOrder] : [];
     const allActive = new Set<string>();
     (['Heavy', 'Light', 'Medium'] as const).forEach(int => {
       Object.keys(userPlan[int] || {}).forEach(ex => allActive.add(ex));
     });
-    const missing = Array.from(allActive).filter(ex => !savedOrder.includes(ex));
-    missing.sort();
-    planExercisesList.push(...savedOrder, ...missing);
+    planExercisesList = getOrderedExerciseNames(
+      userPlan.exerciseOrder || userPlan.globalOrder,
+      Array.from(allActive)
+    );
   }
   
   const planExercisesSet = new Set(planExercisesList);

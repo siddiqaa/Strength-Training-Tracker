@@ -4,7 +4,95 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculateShowDeloadBadge } from './workoutUtils';
+import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples } from './workoutUtils';
+
+describe('createExerciseOrderItems', () => {
+  it('should convert string array into position objects', () => {
+    const exercises = ['Squat', 'Bench Press', 'Barbell Row'];
+    expect(createExerciseOrderItems(exercises)).toEqual([
+      { exercise: 'Squat', position: 0 },
+      { exercise: 'Bench Press', position: 1 },
+      { exercise: 'Barbell Row', position: 2 }
+    ]);
+  });
+});
+
+describe('getOrderedExerciseNames', () => {
+  it('should parse explicit position objects correctly', () => {
+    const items = [
+      { exercise: 'Deadlift', position: 2 },
+      { exercise: 'Squat', position: 0 },
+      { exercise: 'Bench Press', position: 1 }
+    ];
+    // Even if array order is shuffled during serialization/deserialization, it must sort by position index
+    expect(getOrderedExerciseNames(items)).toEqual([
+      'Squat',
+      'Bench Press',
+      'Deadlift'
+    ]);
+  });
+
+  it('should parse legacy tuples or strings cleanly', () => {
+    const tuples: [string, number][] = [
+      ['Deadlift', 2],
+      ['Squat', 0],
+      ['Bench Press', 1]
+    ];
+    expect(getOrderedExerciseNames(tuples)).toEqual([
+      'Squat',
+      'Bench Press',
+      'Deadlift'
+    ]);
+  });
+
+  it('should handle legacy string array order', () => {
+    const legacyArray = ['Squat', 'Bench Press', 'Deadlift'];
+    expect(getOrderedExerciseNames(legacyArray)).toEqual([
+      'Squat',
+      'Bench Press',
+      'Deadlift'
+    ]);
+  });
+
+  it('should handle deletion in the middle and re-number position indices contiguous', () => {
+    const initialExercises = ['Squat', 'Bench Press', 'Barbell Row', 'Deadlift'];
+    // User deletes 'Bench Press'
+    const remaining = initialExercises.filter(e => e !== 'Bench Press');
+    const updatedItems = createExerciseOrderItems(remaining);
+    
+    expect(updatedItems).toEqual([
+      { exercise: 'Squat', position: 0 },
+      { exercise: 'Barbell Row', position: 1 },
+      { exercise: 'Deadlift', position: 2 }
+    ]);
+
+    expect(getOrderedExerciseNames(updatedItems)).toEqual([
+      'Squat',
+      'Barbell Row',
+      'Deadlift'
+    ]);
+  });
+
+  it('should handle new exercises added into plan and assign next available position index on save', () => {
+    const existingOrder = [
+      { exercise: 'Squat', position: 0 },
+      { exercise: 'Bench Press', position: 1 }
+    ];
+    const allActiveIncludingNew = ['Squat', 'Bench Press', 'Overhead Press'];
+    
+    // getOrderedExerciseNames places newly added exercises at the end
+    const currentOrder = getOrderedExerciseNames(existingOrder, allActiveIncludingNew);
+    expect(currentOrder).toEqual(['Squat', 'Bench Press', 'Overhead Press']);
+
+    // When saved, createExerciseOrderItems re-indexes all items contiguously
+    const savedOrder = createExerciseOrderItems(currentOrder);
+    expect(savedOrder).toEqual([
+      { exercise: 'Squat', position: 0 },
+      { exercise: 'Bench Press', position: 1 },
+      { exercise: 'Overhead Press', position: 2 }
+    ]);
+  });
+});
 
 describe('calculateShowDeloadBadge', () => {
   const referenceNow = new Date('2026-07-22T12:00:00Z');

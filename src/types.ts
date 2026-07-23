@@ -26,13 +26,21 @@ export interface DayMetadata {
   restPeriod?: number;
 }
 
+export interface ExerciseOrderItem {
+  exercise: string;
+  position: number;
+}
+
+export type ExerciseOrderTuple = [string, number]; // legacy tuple representation
+
 export interface UserPlan {
   id?: string;
   userId: string;
   Heavy: DayPlan;
   Light: DayPlan;
   Medium: DayPlan;
-  globalOrder?: string[];
+  globalOrder?: (string | ExerciseOrderItem | ExerciseOrderTuple)[];
+  exerciseOrder?: ExerciseOrderItem[];
   exerciseMetadata?: Record<string, ExerciseMetadata>;
   dayMetadata?: {
     Heavy?: DayMetadata;

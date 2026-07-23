@@ -13,7 +13,7 @@ import { ProgressChart } from './ProgressChart';
 import { IntensityChart } from './IntensityChart';
 import { LogManager } from './LogManager';
 import { Plus, Database, AlertCircle, FileJson, Download } from 'lucide-react';
-import { calculateShowDeloadBadge } from '../lib/workoutUtils';
+import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderTuples } from '../lib/workoutUtils';
 
 export function Dashboard() {
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null);
@@ -74,13 +74,22 @@ export function Dashboard() {
           needsUpdate = true;
         }
         
-        // Ensure globalOrder property exists
-        if (!rawData.globalOrder) {
+        // Ensure exerciseOrder / globalOrder exists as explicit position tuples
+        if (!rawData.exerciseOrder && !rawData.globalOrder) {
           const allActive = new Set<string>();
           (['Heavy', 'Light', 'Medium'] as const).forEach(int => {
             Object.keys(rawData[int] || {}).forEach(ex => allActive.add(ex));
           });
-          rawData.globalOrder = Array.from(allActive).sort();
+          const ordered = Array.from(allActive).sort();
+          const tuples = createExerciseOrderTuples(ordered);
+          rawData.exerciseOrder = tuples;
+          rawData.globalOrder = tuples;
+          needsUpdate = true;
+        } else if (!rawData.exerciseOrder && rawData.globalOrder) {
+          const ordered = getOrderedExerciseNames(rawData.globalOrder);
+          const tuples = createExerciseOrderTuples(ordered);
+          rawData.exerciseOrder = tuples;
+          rawData.globalOrder = tuples;
           needsUpdate = true;
         }
         
@@ -95,6 +104,7 @@ export function Dashboard() {
           Heavy: {},
           Light: {},
           Medium: {},
+          exerciseOrder: [],
           globalOrder: []
         };
         setDoc(planRef, defaultUserPlan).catch(error => handleFirestoreError(error, OperationType.WRITE, `userPlans/${auth.currentUser?.uid}`));
@@ -122,15 +132,11 @@ export function Dashboard() {
         
         for (const { int, dayOffset } of days) {
           const plan = userPlan[int] || {};
-          const globalOrder = userPlan.globalOrder || [];
-          const allExercises = Object.keys(plan).sort((a, b) => {
-            const idxA = globalOrder.indexOf(a);
-            const idxB = globalOrder.indexOf(b);
-            if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-            if (idxA !== -1) return -1;
-            if (idxB !== -1) return 1;
-            return a.localeCompare(b);
-          });
+          const planExerciseKeys = Object.keys(plan);
+          const allExercises = getOrderedExerciseNames(
+            userPlan.exerciseOrder || userPlan.globalOrder,
+            planExerciseKeys
+          ).filter(ex => planExerciseKeys.includes(ex));
           
           const date = new Date();
           // Go back 4 weeks, week 0 is oldest, week 3 is newest
@@ -327,15 +333,10 @@ export function Dashboard() {
             
             {(() => {
               const planExercises = Object.keys(userPlan[intensity] || {});
-              const globalOrder = userPlan.globalOrder || [];
-              const sortedExercises = [...planExercises].sort((a, b) => {
-                const idxA = globalOrder.indexOf(a);
-                const idxB = globalOrder.indexOf(b);
-                if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-                if (idxA !== -1) return -1;
-                if (idxB !== -1) return 1;
-                return a.localeCompare(b);
-              });
+              const sortedExercises = getOrderedExerciseNames(
+                userPlan.exerciseOrder || userPlan.globalOrder,
+                planExercises
+              ).filter(ex => planExercises.includes(ex));
 
               return sortedExercises.map((exercise) => {
                 const target = activePlan[exercise];

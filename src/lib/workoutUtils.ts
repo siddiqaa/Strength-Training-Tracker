@@ -3,7 +3,72 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Workout } from '../types';
+import { Workout, ExerciseOrderItem, ExerciseOrderTuple } from '../types';
+
+export { type ExerciseOrderItem, type ExerciseOrderTuple };
+
+/**
+ * Normalizes any form of exercise order (tuples [name, pos] or [pos, name], legacy string array, or objects {exercise, position})
+ * into a cleanly ordered list of exercise names strictly based on explicit stored position index.
+ */
+export function getOrderedExerciseNames(
+  orderData?: any,
+  allActiveExercises: string[] = []
+): string[] {
+  const tupleList: { name: string; pos: number }[] = [];
+  const processedNames = new Set<string>();
+
+  if (Array.isArray(orderData)) {
+    orderData.forEach((item, idx) => {
+      if (typeof item === 'string') {
+        tupleList.push({ name: item, pos: idx });
+        processedNames.add(item);
+      } else if (Array.isArray(item)) {
+        // tuple [name, position] or [position, name]
+        if (typeof item[0] === 'string' && typeof item[1] === 'number') {
+          tupleList.push({ name: item[0], pos: item[1] });
+          processedNames.add(item[0]);
+        } else if (typeof item[0] === 'number' && typeof item[1] === 'string') {
+          tupleList.push({ name: item[1], pos: item[0] });
+          processedNames.add(item[1]);
+        } else if (typeof item[0] === 'string') {
+          tupleList.push({ name: item[0], pos: idx });
+          processedNames.add(item[0]);
+        }
+      } else if (item && typeof item === 'object') {
+        const name = item.exercise || item.name;
+        const pos = typeof item.position === 'number' ? item.position : typeof item.order === 'number' ? item.order : idx;
+        if (name && typeof name === 'string') {
+          tupleList.push({ name, pos });
+          processedNames.add(name);
+        }
+      }
+    });
+  }
+
+  // Sort strictly by the explicit stored position index
+  tupleList.sort((a, b) => a.pos - b.pos);
+
+  const orderedNames = tupleList.map(t => t.name);
+
+  // Add any active exercises missing from orderData at the end in alphabetical order
+  const missing = allActiveExercises.filter(ex => !processedNames.has(ex)).sort();
+  return [...orderedNames, ...missing];
+}
+
+/**
+ * Converts an ordered array of exercise names into explicit position objects supported by Firestore: { exercise: exerciseName, position: positionIndex }.
+ */
+export function createExerciseOrderItems(exercises: string[]): ExerciseOrderItem[] {
+  return exercises.map((name, index) => ({ exercise: name, position: index }));
+}
+
+/**
+ * Creates order items with explicit position index.
+ */
+export function createExerciseOrderTuples(exercises: string[]): ExerciseOrderItem[] {
+  return createExerciseOrderItems(exercises);
+}
 
 /**
  * Calculates whether the user needs a deload.

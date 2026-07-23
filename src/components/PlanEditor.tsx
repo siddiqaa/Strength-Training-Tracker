@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlan, Intensity, PlannedSet } from '../types';
+import { getOrderedExerciseNames, createExerciseOrderTuples } from '../lib/workoutUtils';
 import { Plus, Trash2, ArrowUp, ArrowDown, Download, MessageSquare, AlertCircle, Save, X } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -16,26 +17,28 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
   const [error, setError] = useState('');
 
   const [exercises, setExercises] = useState<string[]>(() => {
-    const savedOrder = userPlan.globalOrder && userPlan.globalOrder.length > 0 ? [...userPlan.globalOrder] : [];
     const allActive = new Set<string>();
     (['Heavy', 'Light', 'Medium'] as Intensity[]).forEach(int => {
       Object.keys(userPlan[int] || {}).forEach(ex => allActive.add(ex));
     });
-    const missing = Array.from(allActive).filter(ex => !savedOrder.includes(ex));
-    missing.sort();
-    return [...savedOrder, ...missing];
+    return getOrderedExerciseNames(
+      userPlan.exerciseOrder || userPlan.globalOrder,
+      Array.from(allActive)
+    );
   });
 
   useEffect(() => {
     setEditedPlan(userPlan);
-    const savedOrder = userPlan.globalOrder && userPlan.globalOrder.length > 0 ? [...userPlan.globalOrder] : [];
     const allActive = new Set<string>();
     (['Heavy', 'Light', 'Medium'] as Intensity[]).forEach(int => {
       Object.keys(userPlan[int] || {}).forEach(ex => allActive.add(ex));
     });
-    const missing = Array.from(allActive).filter(ex => !savedOrder.includes(ex));
-    missing.sort();
-    setExercises([...savedOrder, ...missing]);
+    setExercises(
+      getOrderedExerciseNames(
+        userPlan.exerciseOrder || userPlan.globalOrder,
+        Array.from(allActive)
+      )
+    );
   }, [userPlan]);
 
   const toggleExercise = (exercise: string, intensity: Intensity) => {
@@ -113,10 +116,11 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
        newPlan[int] = dayPlan;
     });
     
-    // Also remove from globalOrder and metadata
-    if (newPlan.globalOrder) {
-      newPlan.globalOrder = newPlan.globalOrder.filter(ex => ex !== exercise);
-    }
+    // Also remove from order structures and metadata
+    const remainingExercises = exercises.filter(e => e !== exercise);
+    const updatedTuples = createExerciseOrderTuples(remainingExercises);
+    newPlan.exerciseOrder = updatedTuples;
+    newPlan.globalOrder = updatedTuples;
     if (newPlan.order) {
       delete (newPlan as any).order;
     }
@@ -125,7 +129,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
     }
 
     setEditedPlan(newPlan);
-    setExercises(exercises.filter(e => e !== exercise));
+    setExercises(remainingExercises);
   };
 
   const moveExercise = (index: number, direction: -1 | 1) => {
@@ -153,7 +157,9 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
 
   const handleSave = () => {
     const finalPlan = { ...editedPlan };
-    finalPlan.globalOrder = exercises;
+    const orderTuples = createExerciseOrderTuples(exercises);
+    finalPlan.exerciseOrder = orderTuples;
+    finalPlan.globalOrder = orderTuples;
     if (finalPlan.order) {
       delete (finalPlan as any).order;
     }

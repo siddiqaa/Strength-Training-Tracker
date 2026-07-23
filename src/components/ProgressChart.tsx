@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { db, auth } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { Workout } from '../types';
+import { getOrderedExerciseNames } from '../lib/workoutUtils';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 
@@ -9,16 +10,16 @@ export function ProgressChart({ workouts, userPlan }: { workouts: Workout[], use
   const [selectedExercise, setSelectedExercise] = useState<string>('');
 
   const exercises = useMemo(() => {
-    const planExercisesList: string[] = [];
+    let planExercisesList: string[] = [];
     if (userPlan) {
-      const savedOrder = userPlan.globalOrder && userPlan.globalOrder.length > 0 ? [...userPlan.globalOrder] : [];
       const allActive = new Set<string>();
       (['Heavy', 'Light', 'Medium'] as const).forEach(int => {
         Object.keys(userPlan[int] || {}).forEach(ex => allActive.add(ex));
       });
-      const missing = Array.from(allActive).filter(ex => !savedOrder.includes(ex));
-      missing.sort();
-      planExercisesList.push(...savedOrder, ...missing);
+      planExercisesList = getOrderedExerciseNames(
+        userPlan.exerciseOrder || userPlan.globalOrder,
+        Array.from(allActive)
+      );
     }
     
     const planExercisesSet = new Set(planExercisesList);
