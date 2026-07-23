@@ -32,11 +32,7 @@ export interface UserPlan {
   Heavy: DayPlan;
   Light: DayPlan;
   Medium: DayPlan;
-  order?: {
-    Heavy: string[];
-    Light: string[];
-    Medium: string[];
-  };
+  globalOrder?: string[];
   exerciseMetadata?: Record<string, ExerciseMetadata>;
   dayMetadata?: {
     Heavy?: DayMetadata;

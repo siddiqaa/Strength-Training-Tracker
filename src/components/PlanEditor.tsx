@@ -17,12 +17,14 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onRawE
   const [error, setError] = useState('');
 
   const [exercises, setExercises] = useState<string[]>(() => {
-    const exSet = new Set<string>();
+    const savedOrder = userPlan.globalOrder && userPlan.globalOrder.length > 0 ? [...userPlan.globalOrder] : [];
+    const allActive = new Set<string>();
     (['Heavy', 'Light', 'Medium'] as Intensity[]).forEach(int => {
-      const order = userPlan.order?.[int] || Object.keys(userPlan[int]);
-      order.forEach(ex => exSet.add(ex));
+      Object.keys(userPlan[int] || {}).forEach(ex => allActive.add(ex));
     });
-    return Array.from(exSet);
+    const missing = Array.from(allActive).filter(ex => !savedOrder.includes(ex));
+    missing.sort();
+    return [...savedOrder, ...missing];
   });
 
   const toggleExercise = (exercise: string, intensity: Intensity) => {
@@ -100,12 +102,13 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onRawE
        newPlan[int] = dayPlan;
     });
     
-    // Also remove from order and metadata
-    (['Heavy', 'Light', 'Medium'] as Intensity[]).forEach(int => {
-      if (newPlan.order?.[int]) {
-        newPlan.order[int] = newPlan.order[int].filter(ex => ex !== exercise);
-      }
-    });
+    // Also remove from globalOrder and metadata
+    if (newPlan.globalOrder) {
+      newPlan.globalOrder = newPlan.globalOrder.filter(ex => ex !== exercise);
+    }
+    if (newPlan.order) {
+      delete (newPlan as any).order;
+    }
     if (newPlan.exerciseMetadata?.[exercise]) {
       delete newPlan.exerciseMetadata[exercise];
     }
@@ -139,11 +142,10 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onRawE
 
   const handleSave = () => {
     const finalPlan = { ...editedPlan };
-    finalPlan.order = {
-      Heavy: exercises.filter(ex => !!finalPlan.Heavy[ex]),
-      Light: exercises.filter(ex => !!finalPlan.Light[ex]),
-      Medium: exercises.filter(ex => !!finalPlan.Medium[ex]),
-    };
+    finalPlan.globalOrder = exercises;
+    if (finalPlan.order) {
+      delete (finalPlan as any).order;
+    }
     
     // Ensure dayMetadata is populated with defaults before saving
     if (!finalPlan.dayMetadata) {

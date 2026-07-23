@@ -63,25 +63,36 @@ export function Dashboard() {
     const planRef = doc(db, 'userPlans', auth.currentUser.uid);
     const unsubscribe = onSnapshot(planRef, (docSnap) => {
       if (docSnap.exists()) {
-        const rawData = docSnap.data() as UserPlan;
+        const rawData = docSnap.data() as any;
+        let needsUpdate = false;
         
-        // Ensure order property exists for backward compatibility
-        if (!rawData.order) {
-          rawData.order = {
-            Heavy: Object.keys(rawData.Heavy || {}),
-            Light: Object.keys(rawData.Light || {}),
-            Medium: Object.keys(rawData.Medium || {})
-          };
+        if ('order' in rawData) {
+          delete rawData.order;
+          needsUpdate = true;
         }
         
-        setUserPlan(rawData);
+        // Ensure globalOrder property exists
+        if (!rawData.globalOrder) {
+          const allActive = new Set<string>();
+          (['Heavy', 'Light', 'Medium'] as const).forEach(int => {
+            Object.keys(rawData[int] || {}).forEach(ex => allActive.add(ex));
+          });
+          rawData.globalOrder = Array.from(allActive).sort();
+          needsUpdate = true;
+        }
+        
+        if (needsUpdate) {
+          setDoc(planRef, rawData).catch(error => console.error('Error cleaning up userPlan order:', error));
+        }
+        
+        setUserPlan(rawData as UserPlan);
       } else {
         const defaultUserPlan: UserPlan = {
           userId: auth.currentUser!.uid,
           Heavy: {},
           Light: {},
           Medium: {},
-          order: { Heavy: [], Light: [], Medium: [] }
+          globalOrder: []
         };
         setDoc(planRef, defaultUserPlan).catch(error => handleFirestoreError(error, OperationType.WRITE, `userPlans/${auth.currentUser?.uid}`));
         setUserPlan(defaultUserPlan);
@@ -108,8 +119,15 @@ export function Dashboard() {
         
         for (const { int, dayOffset } of days) {
           const plan = userPlan[int] || {};
-          const currentOrder = userPlan.order?.[int] || Object.keys(plan);
-          const allExercises = Array.from(new Set([...currentOrder, ...Object.keys(plan)]));
+          const globalOrder = userPlan.globalOrder || [];
+          const allExercises = Object.keys(plan).sort((a, b) => {
+            const idxA = globalOrder.indexOf(a);
+            const idxB = globalOrder.indexOf(b);
+            if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+            if (idxA !== -1) return -1;
+            if (idxB !== -1) return 1;
+            return a.localeCompare(b);
+          });
           
           const date = new Date();
           // Go back 4 weeks, week 0 is oldest, week 3 is newest
@@ -299,13 +317,18 @@ export function Dashboard() {
             </div>
             
             {(() => {
-              const currentOrder = userPlan.order?.[intensity] || Object.keys(userPlan[intensity] || {});
               const planExercises = Object.keys(userPlan[intensity] || {});
-              
-              // Ensure we display all exercises that are in the plan or order
-              const allExercises = Array.from(new Set([...currentOrder, ...planExercises]));
+              const globalOrder = userPlan.globalOrder || [];
+              const sortedExercises = [...planExercises].sort((a, b) => {
+                const idxA = globalOrder.indexOf(a);
+                const idxB = globalOrder.indexOf(b);
+                if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                if (idxA !== -1) return -1;
+                if (idxB !== -1) return 1;
+                return a.localeCompare(b);
+              });
 
-              return allExercises.map((exercise) => {
+              return sortedExercises.map((exercise) => {
                 const target = activePlan[exercise];
                 if (!target) return null;
                 return (

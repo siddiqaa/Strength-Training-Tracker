@@ -9,15 +9,25 @@ export function ProgressChart({ workouts, userPlan }: { workouts: Workout[], use
   const [selectedExercise, setSelectedExercise] = useState<string>('');
 
   const exercises = useMemo(() => {
-    const planExercises = new Set<string>();
+    const planExercisesList: string[] = [];
     if (userPlan) {
+      const savedOrder = userPlan.globalOrder && userPlan.globalOrder.length > 0 ? [...userPlan.globalOrder] : [];
+      const allActive = new Set<string>();
       (['Heavy', 'Light', 'Medium'] as const).forEach(int => {
-        Object.keys(userPlan[int] || {}).forEach(ex => planExercises.add(ex));
+        Object.keys(userPlan[int] || {}).forEach(ex => allActive.add(ex));
       });
+      const missing = Array.from(allActive).filter(ex => !savedOrder.includes(ex));
+      missing.sort();
+      planExercisesList.push(...savedOrder, ...missing);
     }
-    const historyExercises = workouts.map(w => w.exerciseName);
     
-    return Array.from(new Set([...historyExercises, ...planExercises])).sort();
+    const planExercisesSet = new Set(planExercisesList);
+    const historyExercises = workouts.map(w => w.exerciseName);
+    const historyOnlyExercises = Array.from(new Set(historyExercises))
+      .filter(ex => !planExercisesSet.has(ex))
+      .sort();
+
+    return [...planExercisesList, ...historyOnlyExercises];
   }, [workouts, userPlan]);
 
   useEffect(() => {

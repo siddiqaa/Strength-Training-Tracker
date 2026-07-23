@@ -8,7 +8,13 @@ interface JsonEditorModalProps {
 }
 
 export function JsonEditorModal({ userPlan, onSave, onClose }: JsonEditorModalProps) {
-  const [jsonText, setJsonText] = useState(() => JSON.stringify(userPlan, null, 2));
+  const [jsonText, setJsonText] = useState(() => {
+    const cleanPlan = { ...userPlan } as any;
+    if (cleanPlan.order) {
+      delete cleanPlan.order;
+    }
+    return JSON.stringify(cleanPlan, null, 2);
+  });
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -34,22 +40,12 @@ export function JsonEditorModal({ userPlan, onSave, onClose }: JsonEditorModalPr
         }
       }
 
-      if (!parsed.order || typeof parsed.order !== 'object') {
-        throw new Error("Missing or invalid 'order' configuration.");
+      if (parsed.globalOrder !== undefined && !Array.isArray(parsed.globalOrder)) {
+        throw new Error("Invalid 'globalOrder' configuration. Must be an array of strings.");
       }
 
-      for (const intensity of intensities) {
-        if (!Array.isArray(parsed.order[intensity])) {
-          throw new Error(`Missing or invalid order array for '${intensity}' day.`);
-        }
-        const planExercises = Object.keys(parsed[intensity]);
-        const orderExercises = parsed.order[intensity];
-        
-        for (const ex of planExercises) {
-           if (!orderExercises.includes(ex)) {
-             throw new Error(`Exercise '${ex}' is in ${intensity} day plan but missing from order.${intensity} array.`);
-           }
-        }
+      if (parsed.order) {
+        delete parsed.order;
       }
 
       setIsSaving(true);

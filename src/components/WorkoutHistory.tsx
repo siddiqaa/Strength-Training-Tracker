@@ -20,16 +20,26 @@ export function WorkoutHistory({ workouts, userPlan }: { workouts: Workout[], us
     );
   }
 
-  // Combine exercises from history and from the current plan
-  const planExercises = new Set<string>();
+  // Combine exercises from history and from the current plan, keeping the plan's custom order
+  const planExercisesList: string[] = [];
   if (userPlan) {
+    const savedOrder = userPlan.globalOrder && userPlan.globalOrder.length > 0 ? [...userPlan.globalOrder] : [];
+    const allActive = new Set<string>();
     (['Heavy', 'Light', 'Medium'] as const).forEach(int => {
-      Object.keys(userPlan[int] || {}).forEach(ex => planExercises.add(ex));
+      Object.keys(userPlan[int] || {}).forEach(ex => allActive.add(ex));
     });
+    const missing = Array.from(allActive).filter(ex => !savedOrder.includes(ex));
+    missing.sort();
+    planExercisesList.push(...savedOrder, ...missing);
   }
-  const historyExercises = workouts.map(w => w.exerciseName);
   
-  const exercises = Array.from(new Set([...historyExercises, ...planExercises])).sort();
+  const planExercisesSet = new Set(planExercisesList);
+  const historyExercises = workouts.map(w => w.exerciseName);
+  const historyOnlyExercises = Array.from(new Set(historyExercises))
+    .filter(ex => !planExercisesSet.has(ex))
+    .sort();
+
+  const exercises = [...planExercisesList, ...historyOnlyExercises];
 
   return (
     <div className="space-y-6 mt-8">
