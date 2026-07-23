@@ -12,8 +12,8 @@ import { WorkoutHistory } from './WorkoutHistory';
 import { ProgressChart } from './ProgressChart';
 import { IntensityChart } from './IntensityChart';
 import { LogManager } from './LogManager';
-import { JsonEditorModal } from './JsonEditorModal';
 import { Plus, Database, AlertCircle, FileJson, Download } from 'lucide-react';
+import { calculateShowDeloadBadge } from '../lib/workoutUtils';
 
 export function Dashboard() {
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null);
@@ -27,7 +27,6 @@ export function Dashboard() {
   const [intensity, setIntensity] = useState<Intensity>('Heavy');
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<'data' | 'progress' | 'editor' | 'logs'>('data');
-  const [showJsonEditor, setShowJsonEditor] = useState(false);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -57,6 +56,10 @@ export function Dashboard() {
     const last = workouts.find(w => w.intensity === intensity);
     return last ? new Date(last.date) : null;
   }, [workouts, intensity]);
+
+  const showDeloadBadge = React.useMemo(() => {
+    return calculateShowDeloadBadge(workouts);
+  }, [workouts]);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -260,9 +263,15 @@ export function Dashboard() {
         <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-4 sm:p-6 lg:p-8 shadow-xl">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-4">
             <div className="flex flex-col gap-1">
-              <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-3">
+              <h2 className="text-2xl font-black text-white tracking-tight flex flex-wrap items-center gap-3">
                 <span className="w-2 h-8 bg-orange-500 rounded-full"></span>
-                PLAN VS ACTUAL
+                <span>PLAN VS ACTUAL</span>
+                {showDeloadBadge && (
+                  <span className="px-3 py-1 bg-red-500/10 border border-red-500/30 text-red-500 text-[10px] font-black uppercase tracking-widest rounded-full animate-pulse flex items-center gap-1.5" title="You have not had a break of 6 or more consecutive days in the last 60 days">
+                    <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                    Deload Needed
+                  </span>
+                )}
               </h2>
               {lastLoggedDate && (
                 <div className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest pl-5 flex items-center gap-2">
@@ -359,7 +368,6 @@ export function Dashboard() {
         <div className="mt-4 relative">
           <PlanEditor 
             userPlan={userPlan} 
-            onRawEdit={() => setShowJsonEditor(true)}
             onDeleteExercise={async (exercise: string) => {
               if (!auth.currentUser) return;
               const workoutsToDelete = workouts.filter(w => w.exerciseName === exercise);
@@ -403,25 +411,6 @@ export function Dashboard() {
           <LogManager workouts={workouts} />
         </div>
       )}
-
-      {showJsonEditor && (
-        <JsonEditorModal 
-          userPlan={userPlan}
-          onClose={() => setShowJsonEditor(false)}
-          onSave={async (newPlan) => {
-            if (!auth.currentUser) return;
-            const path = `userPlans/${auth.currentUser.uid}`;
-            try {
-              const planRef = doc(db, 'userPlans', auth.currentUser.uid);
-              await setDoc(planRef, newPlan);
-              setUserPlan(newPlan);
-              setShowJsonEditor(false);
-            } catch (error) {
-              handleFirestoreError(error, OperationType.WRITE, path);
-            }
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -434,16 +423,18 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
   const [rpe, setRpe] = useState<'E' | 'M' | 'H'>('M');
   const [isLogging, setIsLogging] = useState(false);
 
-  const lastWorkoutWeight = React.useMemo(() => {
-    const last = workouts.find(w => w.exerciseName === exercise && w.intensity === intensity);
-    return last ? last.weight : null;
+  const lastWorkout = React.useMemo(() => {
+    return workouts.find(w => w.exerciseName === exercise && w.intensity === intensity);
   }, [workouts, exercise, intensity]);
+
+  const lastWorkoutWeight = lastWorkout ? lastWorkout.weight : null;
+  const lastWorkoutRpe = lastWorkout ? lastWorkout.rpe : null;
 
   const isSingleDay = React.useMemo(() => {
     let count = 0;
     (['Heavy', 'Light', 'Medium'] as const).forEach(int => {
-      const order = userPlan.order?.[int] || Object.keys(userPlan[int] || {});
-      if (order.includes(exercise)) {
+      const exerciseNames = Object.keys(userPlan[int] || {});
+      if (exerciseNames.includes(exercise)) {
         count++;
       }
     });
@@ -505,15 +496,20 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
   };
   
   const handleSaveTarget = async () => {
-     if (!auth.currentUser) return;
+     if (!auth.currentUser || !userPlan) return;
      const path = `userPlans/${auth.currentUser.uid}`;
      try {
        const planRef = doc(db, 'userPlans', auth.currentUser.uid);
-       const updated = { ...userPlan };
-       updated[intensity][exercise] = {
-         weight: Number(actualWt),
-         sets: expectedSets,
-         reps: String(set1),
+       const updated = {
+         ...userPlan,
+         [intensity]: {
+           ...(userPlan[intensity] || {}),
+           [exercise]: {
+             weight: Number(actualWt),
+             sets: expectedSets,
+             reps: String(set1),
+           }
+         }
        };
        await setDoc(planRef, updated);
      } catch (error) {
@@ -555,7 +551,17 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
         <div className="md:col-span-2 flex items-center justify-center font-mono text-sm bg-zinc-900/80 py-1.5 md:py-2 px-3 rounded-xl border border-zinc-800">
           <span className="text-white" title="Plan">{target.weight}</span>
           <span className="text-zinc-600 mx-1.5">/</span>
-          <span className="text-zinc-400" title="Last">{lastWorkoutWeight !== null ? lastWorkoutWeight : '-'}</span>
+          <span 
+            className={
+              lastWorkoutRpe === 'E' ? 'text-green-500 font-bold' :
+              lastWorkoutRpe === 'M' ? 'text-yellow-500 font-bold' :
+              lastWorkoutRpe === 'H' ? 'text-red-500 font-bold' :
+              'text-zinc-400'
+            } 
+            title="Last"
+          >
+            {lastWorkoutWeight !== null ? lastWorkoutWeight : '-'}
+          </span>
           {calcWeight !== null && (
             <>
               <span className="text-zinc-600 mx-1.5">/</span>

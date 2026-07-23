@@ -1,17 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserPlan, Intensity, PlannedSet } from '../types';
-import { Plus, Trash2, ArrowUp, ArrowDown, Download, FileJson, MessageSquare, AlertCircle, Save, X } from 'lucide-react';
+import { Plus, Trash2, ArrowUp, ArrowDown, Download, MessageSquare, AlertCircle, Save, X } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 interface PlanEditorProps {
   userPlan: UserPlan;
   onSave: (newPlan: UserPlan) => Promise<void>;
-  onRawEdit?: () => void;
   onDeleteExercise?: (exercise: string) => Promise<void>;
 }
 
-export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onRawEdit, onDeleteExercise }) => {
+export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDeleteExercise }) => {
   const [editedPlan, setEditedPlan] = useState<UserPlan>(userPlan);
   const [newExercise, setNewExercise] = useState('');
   const [error, setError] = useState('');
@@ -26,6 +25,18 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onRawE
     missing.sort();
     return [...savedOrder, ...missing];
   });
+
+  useEffect(() => {
+    setEditedPlan(userPlan);
+    const savedOrder = userPlan.globalOrder && userPlan.globalOrder.length > 0 ? [...userPlan.globalOrder] : [];
+    const allActive = new Set<string>();
+    (['Heavy', 'Light', 'Medium'] as Intensity[]).forEach(int => {
+      Object.keys(userPlan[int] || {}).forEach(ex => allActive.add(ex));
+    });
+    const missing = Array.from(allActive).filter(ex => !savedOrder.includes(ex));
+    missing.sort();
+    setExercises([...savedOrder, ...missing]);
+  }, [userPlan]);
 
   const toggleExercise = (exercise: string, intensity: Intensity) => {
     const newPlan = { ...editedPlan };
@@ -322,15 +333,6 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onRawE
           PLAN EDITOR
         </h2>
         <div className="flex flex-wrap gap-3 w-full sm:w-auto">
-          {onRawEdit && (
-            <button
-              onClick={onRawEdit}
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-zinc-900 border border-zinc-800 text-white text-sm font-black uppercase tracking-widest rounded-xl hover:bg-zinc-800 transition-colors active:scale-95 flex items-center justify-center gap-2"
-            >
-              <FileJson className="w-4 h-4" />
-              Raw JSON
-            </button>
-          )}
           <button 
             onClick={generatePDF}
             className="flex-1 sm:flex-none px-4 py-2.5 bg-zinc-900 border border-zinc-800 text-white text-sm font-black uppercase tracking-widest rounded-xl hover:bg-zinc-800 transition-colors active:scale-95 flex items-center justify-center gap-2"
