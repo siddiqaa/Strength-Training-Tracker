@@ -80,6 +80,19 @@ export function Dashboard() {
           needsPurge = true;
         }
 
+        if (!rawData.exerciseOrder || rawData.exerciseOrder.length === 0) {
+          const allActive = new Set<string>();
+          (['Heavy', 'Light', 'Medium'] as Intensity[]).forEach(int => {
+            if (rawData[int]) {
+              Object.keys(rawData[int]).forEach(ex => allActive.add(ex));
+            }
+          });
+          if (allActive.size > 0) {
+            rawData.exerciseOrder = createExerciseOrderItems(Array.from(allActive));
+            needsPurge = true;
+          }
+        }
+
         if (needsPurge) {
           setDoc(planRef, rawData).catch(error => handleFirestoreError(error, OperationType.WRITE, `userPlans/${auth.currentUser?.uid}`));
         }

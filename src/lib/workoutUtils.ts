@@ -47,7 +47,7 @@ export function getOrderedExerciseNames(
   const orderedNames = tupleList.map(t => t.name);
 
   // Add any active exercises missing from orderData at the end
-  const missing = allActiveExercises.filter(ex => !processedNames.has(ex)).sort();
+  const missing = allActiveExercises.filter(ex => !processedNames.has(ex));
   return [...orderedNames, ...missing];
 }
 
