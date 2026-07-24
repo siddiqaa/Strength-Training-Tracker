@@ -29,7 +29,7 @@ export function WorkoutHistory({ workouts, userPlan }: { workouts: Workout[], us
       Object.keys(userPlan[int] || {}).forEach(ex => allActive.add(ex));
     });
     planExercisesList = getOrderedExerciseNames(
-      userPlan.exerciseOrder || userPlan.globalOrder,
+      userPlan.exerciseOrder,
       Array.from(allActive)
     );
   }

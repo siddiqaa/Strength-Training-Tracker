@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlan, Intensity, PlannedSet } from '../types';
-import { getOrderedExerciseNames, createExerciseOrderTuples } from '../lib/workoutUtils';
+import { getOrderedExerciseNames, createExerciseOrderItems } from '../lib/workoutUtils';
 import { Plus, Trash2, ArrowUp, ArrowDown, Download, MessageSquare, AlertCircle, Save, X } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -22,7 +22,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
       Object.keys(userPlan[int] || {}).forEach(ex => allActive.add(ex));
     });
     return getOrderedExerciseNames(
-      userPlan.exerciseOrder || userPlan.globalOrder,
+      userPlan.exerciseOrder,
       Array.from(allActive)
     );
   });
@@ -35,7 +35,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
     });
     setExercises(
       getOrderedExerciseNames(
-        userPlan.exerciseOrder || userPlan.globalOrder,
+        userPlan.exerciseOrder,
         Array.from(allActive)
       )
     );
@@ -118,12 +118,8 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
     
     // Also remove from order structures and metadata
     const remainingExercises = exercises.filter(e => e !== exercise);
-    const updatedTuples = createExerciseOrderTuples(remainingExercises);
-    newPlan.exerciseOrder = updatedTuples;
-    newPlan.globalOrder = updatedTuples;
-    if (newPlan.order) {
-      delete (newPlan as any).order;
-    }
+    const updatedOrder = createExerciseOrderItems(remainingExercises);
+    newPlan.exerciseOrder = updatedOrder;
     if (newPlan.exerciseMetadata?.[exercise]) {
       delete newPlan.exerciseMetadata[exercise];
     }
@@ -157,12 +153,10 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
 
   const handleSave = () => {
     const finalPlan = { ...editedPlan };
-    const orderTuples = createExerciseOrderTuples(exercises);
-    finalPlan.exerciseOrder = orderTuples;
-    finalPlan.globalOrder = orderTuples;
-    if (finalPlan.order) {
-      delete (finalPlan as any).order;
-    }
+    const orderItems = createExerciseOrderItems(exercises);
+    finalPlan.exerciseOrder = orderItems;
+    delete (finalPlan as any).globalOrder;
+    delete (finalPlan as any).order;
     
     // Ensure dayMetadata is populated with defaults before saving
     if (!finalPlan.dayMetadata) {

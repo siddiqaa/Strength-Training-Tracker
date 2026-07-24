@@ -17,7 +17,7 @@ export function ProgressChart({ workouts, userPlan }: { workouts: Workout[], use
         Object.keys(userPlan[int] || {}).forEach(ex => allActive.add(ex));
       });
       planExercisesList = getOrderedExerciseNames(
-        userPlan.exerciseOrder || userPlan.globalOrder,
+        userPlan.exerciseOrder,
         Array.from(allActive)
       );
     }

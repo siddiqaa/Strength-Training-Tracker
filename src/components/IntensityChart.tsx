@@ -45,7 +45,7 @@ export function IntensityChart({ workouts, userPlan }: { workouts: Workout[], us
     
     if (userPlan) {
       const orderedNames = getOrderedExerciseNames(
-        userPlan.exerciseOrder || userPlan.globalOrder,
+        userPlan.exerciseOrder,
         Array.from(exercises)
       );
       return orderedNames.filter(ex => exercises.has(ex));

@@ -13,17 +13,11 @@ import { ProgressChart } from './ProgressChart';
 import { IntensityChart } from './IntensityChart';
 import { LogManager } from './LogManager';
 import { Plus, Database, AlertCircle, FileJson, Download } from 'lucide-react';
-import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderTuples } from '../lib/workoutUtils';
+import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems } from '../lib/workoutUtils';
 
 export function Dashboard() {
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null);
-  const [workouts, setWorkouts] = useState<Workout[]>(() => {
-    const cached = localStorage.getItem('workouts_cache');
-    if (cached) {
-      try { return JSON.parse(cached); } catch (e) {}
-    }
-    return [];
-  });
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [intensity, setIntensity] = useState<Intensity>('Heavy');
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<'data' | 'progress' | 'editor' | 'logs'>('data');
@@ -45,7 +39,6 @@ export function Dashboard() {
       });
       data.sort((a, b) => b.date - a.date);
       setWorkouts(data);
-      localStorage.setItem('workouts_cache', JSON.stringify(data));
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'workouts');
     });
@@ -67,36 +60,30 @@ export function Dashboard() {
     const unsubscribe = onSnapshot(planRef, (docSnap) => {
       if (docSnap.exists()) {
         const rawData = docSnap.data() as any;
-        let needsUpdate = false;
-        
+        let needsPurge = false;
+
+        if ('globalOrder' in rawData) {
+          if ((!rawData.exerciseOrder || rawData.exerciseOrder.length === 0) && rawData.globalOrder) {
+            const names = getOrderedExerciseNames(rawData.globalOrder);
+            rawData.exerciseOrder = createExerciseOrderItems(names);
+          }
+          delete rawData.globalOrder;
+          needsPurge = true;
+        }
+
         if ('order' in rawData) {
+          if ((!rawData.exerciseOrder || rawData.exerciseOrder.length === 0) && rawData.order) {
+            const names = getOrderedExerciseNames(rawData.order);
+            rawData.exerciseOrder = createExerciseOrderItems(names);
+          }
           delete rawData.order;
-          needsUpdate = true;
+          needsPurge = true;
         }
-        
-        // Ensure exerciseOrder / globalOrder exists as explicit position tuples
-        if (!rawData.exerciseOrder && !rawData.globalOrder) {
-          const allActive = new Set<string>();
-          (['Heavy', 'Light', 'Medium'] as const).forEach(int => {
-            Object.keys(rawData[int] || {}).forEach(ex => allActive.add(ex));
-          });
-          const ordered = Array.from(allActive).sort();
-          const tuples = createExerciseOrderTuples(ordered);
-          rawData.exerciseOrder = tuples;
-          rawData.globalOrder = tuples;
-          needsUpdate = true;
-        } else if (!rawData.exerciseOrder && rawData.globalOrder) {
-          const ordered = getOrderedExerciseNames(rawData.globalOrder);
-          const tuples = createExerciseOrderTuples(ordered);
-          rawData.exerciseOrder = tuples;
-          rawData.globalOrder = tuples;
-          needsUpdate = true;
+
+        if (needsPurge) {
+          setDoc(planRef, rawData).catch(error => handleFirestoreError(error, OperationType.WRITE, `userPlans/${auth.currentUser?.uid}`));
         }
-        
-        if (needsUpdate) {
-          setDoc(planRef, rawData).catch(error => console.error('Error cleaning up userPlan order:', error));
-        }
-        
+
         setUserPlan(rawData as UserPlan);
       } else {
         const defaultUserPlan: UserPlan = {
@@ -104,8 +91,7 @@ export function Dashboard() {
           Heavy: {},
           Light: {},
           Medium: {},
-          exerciseOrder: [],
-          globalOrder: []
+          exerciseOrder: []
         };
         setDoc(planRef, defaultUserPlan).catch(error => handleFirestoreError(error, OperationType.WRITE, `userPlans/${auth.currentUser?.uid}`));
         setUserPlan(defaultUserPlan);
@@ -130,13 +116,13 @@ export function Dashboard() {
           { int: 'Medium' as Intensity, dayOffset: 4 }
         ];
         
-        for (const { int, dayOffset } of days) {
-          const plan = userPlan[int] || {};
-          const planExerciseKeys = Object.keys(plan);
-          const allExercises = getOrderedExerciseNames(
-            userPlan.exerciseOrder || userPlan.globalOrder,
-            planExerciseKeys
-          ).filter(ex => planExerciseKeys.includes(ex));
+          for (const { int, dayOffset } of days) {
+            const plan = userPlan[int] || {};
+            const planExerciseKeys = Object.keys(plan);
+            const allExercises = getOrderedExerciseNames(
+              userPlan.exerciseOrder,
+              planExerciseKeys
+            ).filter(ex => planExerciseKeys.includes(ex));
           
           const date = new Date();
           // Go back 4 weeks, week 0 is oldest, week 3 is newest
@@ -334,7 +320,7 @@ export function Dashboard() {
             {(() => {
               const planExercises = Object.keys(userPlan[intensity] || {});
               const sortedExercises = getOrderedExerciseNames(
-                userPlan.exerciseOrder || userPlan.globalOrder,
+                userPlan.exerciseOrder,
                 planExercises
               ).filter(ex => planExercises.includes(ex));
 
@@ -396,8 +382,11 @@ export function Dashboard() {
               const path = `userPlans/${auth.currentUser.uid}`;
               try {
                 const planRef = doc(db, 'userPlans', auth.currentUser.uid);
-                await setDoc(planRef, newPlan);
-                setUserPlan(newPlan);
+                const cleanPlan = { ...newPlan };
+                delete (cleanPlan as any).globalOrder;
+                delete (cleanPlan as any).order;
+                await setDoc(planRef, cleanPlan);
+                setUserPlan(cleanPlan);
                 setActiveTab('data');
               } catch (error) {
                 handleFirestoreError(error, OperationType.WRITE, path);
@@ -512,6 +501,8 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
            }
          }
        };
+       delete (updated as any).globalOrder;
+       delete (updated as any).order;
        await setDoc(planRef, updated);
      } catch (error) {
        handleFirestoreError(error, OperationType.WRITE, path);

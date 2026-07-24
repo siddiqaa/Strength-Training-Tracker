@@ -31,15 +31,12 @@ export interface ExerciseOrderItem {
   position: number;
 }
 
-export type ExerciseOrderTuple = [string, number]; // legacy tuple representation
-
 export interface UserPlan {
   id?: string;
   userId: string;
   Heavy: DayPlan;
   Light: DayPlan;
   Medium: DayPlan;
-  globalOrder?: (string | ExerciseOrderItem | ExerciseOrderTuple)[];
   exerciseOrder?: ExerciseOrderItem[];
   exerciseMetadata?: Record<string, ExerciseMetadata>;
   dayMetadata?: {
