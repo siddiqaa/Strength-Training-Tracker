@@ -419,12 +419,26 @@ export function Dashboard() {
 }
 
 const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, userPlan: UserPlan, workouts: Workout[] }> = ({ exercise, target, intensity, userPlan, workouts }) => {
-  const [actualWt, setActualWt] = useState(target.weight);
-  const [set1, set1Reps] = useState(target.reps.split('-')[0] || target.reps);
-  const [set2, set2Reps] = useState(target.reps.split('-')[0] || target.reps);
-  const [set3, set3Reps] = useState(target.reps.split('-')[0] || target.reps);
+  const [actualWt, setActualWt] = useState<string | number>(target.weight);
+  const [set1, set1Reps] = useState<string | number>('');
+  const [set2, set2Reps] = useState<string | number>('');
+  const [set3, set3Reps] = useState<string | number>('');
   const [rpe, setRpe] = useState<'E' | 'M' | 'H'>('M');
   const [isLogging, setIsLogging] = useState(false);
+
+  const todayWorkout = React.useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    return workouts.find(w => {
+      const wDate = new Date(w.date);
+      return w.exerciseName === exercise && 
+             wDate >= today && 
+             wDate < tomorrow;
+    });
+  }, [workouts, exercise]);
 
   const lastWorkout = React.useMemo(() => {
     return workouts.find(w => w.exerciseName === exercise && w.intensity === intensity);
@@ -446,9 +460,9 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
 
   useEffect(() => {
     setActualWt(target.weight);
-    set1Reps(target.reps.split('-')[0] || target.reps);
-    set2Reps(target.reps.split('-')[0] || target.reps);
-    set3Reps(target.reps.split('-')[0] || target.reps);
+    set1Reps('');
+    set2Reps('');
+    set3Reps('');
     setRpe('M');
   }, [target]);
 
@@ -458,26 +472,13 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
     if (!auth.currentUser) return;
     setIsLogging(true);
     try {
-      // Find if an entry already exists for this exercise on this calendar date
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      const existingWorkout = workouts.find(w => {
-        const wDate = new Date(w.date);
-        return w.exerciseName === exercise && 
-               wDate >= today && 
-               wDate < tomorrow;
-      });
-
       const workoutData = {
         userId: auth.currentUser.uid,
         exerciseName: exercise,
         weight: Number(actualWt),
-        set1: Number(set1),
-        set2: Number(set2),
-        ...(expectedSets >= 3 ? { set3: Number(set3) } : {}),
+        set1: set1 !== '' ? Number(set1) : 0,
+        set2: set2 !== '' ? Number(set2) : 0,
+        ...(expectedSets >= 3 ? { set3: set3 !== '' ? Number(set3) : 0 } : {}),
         intensity,
         targetWeight: target.weight,
         targetReps: target.reps,
@@ -486,8 +487,8 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
         date: serverTimestamp(),
       };
 
-      if (existingWorkout?.id) {
-        await setDoc(doc(db, 'workouts', existingWorkout.id), workoutData);
+      if (todayWorkout?.id) {
+        await setDoc(doc(db, 'workouts', todayWorkout.id), workoutData);
       } else {
         await addDoc(collection(db, 'workouts'), workoutData);
       }
@@ -510,7 +511,7 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
            [exercise]: {
              weight: Number(actualWt),
              sets: expectedSets,
-             reps: String(set1),
+             reps: set1 !== '' ? String(set1) : target.reps,
            }
          }
        };
@@ -522,7 +523,7 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
      }
   }
 
-  const isDiff = actualWt !== target.weight || String(set1) !== (target.reps.split('-')[0] || target.reps);
+  const isDiff = actualWt !== target.weight || (set1 !== '' && String(set1) !== (target.reps.split('-')[0] || target.reps));
 
   let calcWeight = null;
   const heavyPlanWeight = userPlan['Heavy']?.[exercise]?.weight;
@@ -577,16 +578,16 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
       </div>
       
       <div className="md:col-span-5 w-full flex flex-row gap-2 md:gap-1 justify-between md:justify-center items-center bg-zinc-900/40 md:bg-transparent p-3 md:p-0 rounded-xl md:rounded-none">
-        <input type="number" step="any" value={actualWt} onChange={e => setActualWt(Number(e.target.value))} className="w-16 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Actual Weight" />
+        <input type="number" step="any" value={actualWt} onChange={e => setActualWt(e.target.value === '' ? '' : Number(e.target.value))} className="w-16 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Actual Weight" />
         
         <span className="text-zinc-600 font-black px-1 hidden md:flex items-center">|</span>
         
         <div className="flex items-center gap-1.5 md:gap-2">
           <div className="flex gap-1.5 md:gap-1">
-            <input type="number" value={set1} onChange={e => set1Reps(Number(e.target.value))} className="w-12 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 1 Reps" />
-            <input type="number" value={set2} onChange={e => set2Reps(Number(e.target.value))} className="w-12 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 2 Reps" />
+            <input type="number" value={set1} onChange={e => set1Reps(e.target.value === '' ? '' : Number(e.target.value))} className="w-12 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 1 Reps" />
+            <input type="number" value={set2} onChange={e => set2Reps(e.target.value === '' ? '' : Number(e.target.value))} className="w-12 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 2 Reps" />
             {expectedSets >= 3 && (
-              <input type="number" value={set3} onChange={e => set3Reps(Number(e.target.value))} className="w-12 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 3 Reps" />
+              <input type="number" value={set3} onChange={e => set3Reps(e.target.value === '' ? '' : Number(e.target.value))} className="w-12 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 3 Reps" />
             )}
           </div>
             
