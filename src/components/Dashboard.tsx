@@ -463,12 +463,20 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
   }, [userPlan, exercise]);
 
   useEffect(() => {
-    setActualWt(target.weight);
-    set1Reps('');
-    set2Reps('');
-    set3Reps('');
-    setRpe('M');
-  }, [target]);
+    if (todayWorkout) {
+      setActualWt(todayWorkout.weight !== undefined && todayWorkout.weight !== null ? todayWorkout.weight : target.weight);
+      set1Reps(todayWorkout.set1 !== undefined && todayWorkout.set1 !== null && todayWorkout.set1 !== 0 ? todayWorkout.set1 : '');
+      set2Reps(todayWorkout.set2 !== undefined && todayWorkout.set2 !== null && todayWorkout.set2 !== 0 ? todayWorkout.set2 : '');
+      set3Reps(todayWorkout.set3 !== undefined && todayWorkout.set3 !== null && todayWorkout.set3 !== 0 ? todayWorkout.set3 : '');
+      setRpe(todayWorkout.rpe || 'M');
+    } else {
+      setActualWt(target.weight);
+      set1Reps('');
+      set2Reps('');
+      set3Reps('');
+      setRpe('M');
+    }
+  }, [target, todayWorkout]);
 
   const expectedSets = target.sets || 3;
 
@@ -546,9 +554,26 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
       <div className="flex items-center justify-between w-full md:contents">
         <div className="md:col-span-3 w-full font-bold text-white text-base md:text-sm flex flex-col">
           <div className="flex items-center gap-2 truncate">
-            <span className="truncate" title={exercise}>{exercise}</span>
+            <span 
+              className={`truncate transition-all ${
+                todayWorkout 
+                  ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40 px-2 py-0.5 rounded-md font-extrabold shadow-sm' 
+                  : 'text-white'
+              }`} 
+              title={exercise}
+            >
+              {exercise}
+            </span>
             {isSingleDay && <span title="One Day a Week Only" className="flex items-center"><AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" /></span>}
           </div>
+          {todayWorkout && (
+            <div className="mt-1">
+              <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20">
+                <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse"></span>
+                Logged Today
+              </span>
+            </div>
+          )}
           {/* Desktop Notes: Keep them under title for grid clarity */}
           {userPlan.exerciseMetadata?.[exercise]?.notes && (
             <div className="hidden md:block mt-1">
