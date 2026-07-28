@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Intensity } from '../types';
-import { X, Play, Pause, RotateCcw, Plus, Minus, Timer, CheckCircle2 } from 'lucide-react';
+import { X, Play, Pause, RotateCcw, Plus, Minus, Timer, CheckCircle2, Clock } from 'lucide-react';
 
 interface RestTimerModalProps {
   isOpen: boolean;
@@ -20,6 +20,9 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
   const [timeLeft, setTimeLeft] = useState(restSeconds);
   const [isRunning, setIsRunning] = useState(true);
   const [hasFinished, setHasFinished] = useState(false);
+  
+  // Store target end timestamp (Date.now() + remainingMs) to prevent background throttling drift
+  const endTimeRef = useRef<number>(Date.now() + restSeconds * 1000);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sound generator using Web Audio API
@@ -50,9 +53,23 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
     }
   };
 
+  // Function to sync remaining time based on actual system clock delta
+  const syncTimeLeft = () => {
+    if (!isRunning) return;
+    const now = Date.now();
+    const remainingSeconds = Math.max(0, Math.ceil((endTimeRef.current - now) / 1000));
+    setTimeLeft(remainingSeconds);
+    if (remainingSeconds <= 0) {
+      setIsRunning(false);
+      setHasFinished(true);
+      playBeep();
+    }
+  };
+
   // Reset timer state when modal opens
   useEffect(() => {
     if (isOpen) {
+      endTimeRef.current = Date.now() + restSeconds * 1000;
       setTimeLeft(restSeconds);
       setIsRunning(true);
       setHasFinished(false);
@@ -61,27 +78,32 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
     }
   }, [isOpen, restSeconds]);
 
-  // Handle countdown interval
+  // Handle countdown interval & visibility/focus sync
   useEffect(() => {
-    if (isOpen && isRunning && timeLeft > 0) {
-      timerRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            clearInterval(timerRef.current!);
-            setIsRunning(false);
-            setHasFinished(true);
-            playBeep();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
+    if (isOpen && isRunning && !hasFinished) {
+      // Immediately calculate current remaining time on start/resume
+      syncTimeLeft();
 
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isOpen, isRunning, timeLeft]);
+      timerRef.current = setInterval(() => {
+        syncTimeLeft();
+      }, 250); // Tick frequently to keep UI crisp
+
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          syncTimeLeft();
+        }
+      };
+
+      window.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('focus', handleVisibilityChange);
+
+      return () => {
+        if (timerRef.current) clearInterval(timerRef.current);
+        window.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('focus', handleVisibilityChange);
+      };
+    }
+  }, [isOpen, isRunning, hasFinished]);
 
   // Auto-dismiss modal after timer completes
   useEffect(() => {
@@ -107,7 +129,11 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
   const progressPercent = Math.max(0, Math.min(100, (timeLeft / (restSeconds || 1)) * 100));
 
   const handleAdjustTime = (delta: number) => {
-    setTimeLeft((prev) => Math.max(0, prev + delta));
+    setTimeLeft((prev) => {
+      const newTime = Math.max(0, prev + delta);
+      endTimeRef.current = Date.now() + newTime * 1000;
+      return newTime;
+    });
     if (hasFinished && delta > 0) {
       setHasFinished(false);
       setIsRunning(true);
@@ -115,9 +141,20 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
   };
 
   const handleReset = () => {
+    endTimeRef.current = Date.now() + restSeconds * 1000;
     setTimeLeft(restSeconds);
     setIsRunning(true);
     setHasFinished(false);
+  };
+
+  const handleTogglePlayPause = () => {
+    if (!isRunning) {
+      // When resuming from pause, recalculate endTimeRef based on current timeLeft
+      endTimeRef.current = Date.now() + timeLeft * 1000;
+      setIsRunning(true);
+    } else {
+      setIsRunning(false);
+    }
   };
 
   const intensityBadgeClass =
@@ -130,6 +167,17 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center relative shadow-2xl flex flex-col items-center gap-6">
+        {/* Manual Resync Clock Button */}
+        <button
+          onClick={() => {
+            syncTimeLeft();
+          }}
+          className="absolute top-4 left-4 p-2 text-zinc-500 hover:text-orange-400 hover:bg-zinc-800 rounded-full transition-colors"
+          title="Manual Sync with System Clock"
+        >
+          <Clock className="w-5 h-5" />
+        </button>
+
         {/* Close / Dismiss button */}
         <button
           onClick={onClose}
@@ -214,7 +262,7 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
           </button>
 
           <button
-            onClick={() => setIsRunning(!isRunning)}
+            onClick={handleTogglePlayPause}
             disabled={hasFinished}
             className="flex-1 py-2.5 px-4 bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-orange-600 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-40 shadow-lg"
           >
