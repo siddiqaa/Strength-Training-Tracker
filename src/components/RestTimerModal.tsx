@@ -83,6 +83,19 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
     };
   }, [isOpen, isRunning, timeLeft]);
 
+  // Auto-dismiss modal after timer completes
+  useEffect(() => {
+    let dismissTimeout: NodeJS.Timeout | null = null;
+    if (isOpen && hasFinished) {
+      dismissTimeout = setTimeout(() => {
+        onClose();
+      }, 1200);
+    }
+    return () => {
+      if (dismissTimeout) clearTimeout(dismissTimeout);
+    };
+  }, [isOpen, hasFinished, onClose]);
+
   if (!isOpen) return null;
 
   const formatTime = (seconds: number) => {
