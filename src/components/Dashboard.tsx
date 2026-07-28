@@ -12,6 +12,7 @@ import { WorkoutHistory } from './WorkoutHistory';
 import { ProgressChart } from './ProgressChart';
 import { IntensityChart } from './IntensityChart';
 import { LogManager } from './LogManager';
+import { RestTimerModal } from './RestTimerModal';
 import { Plus, Database, AlertCircle, FileJson, Download } from 'lucide-react';
 import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems } from '../lib/workoutUtils';
 
@@ -425,6 +426,9 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
   const [set3, set3Reps] = useState<string | number>('');
   const [rpe, setRpe] = useState<'E' | 'M' | 'H'>('M');
   const [isLogging, setIsLogging] = useState(false);
+  const [showTimer, setShowTimer] = useState(false);
+
+  const restSeconds = userPlan.dayMetadata?.[intensity]?.restPeriod ?? 90;
 
   const todayWorkout = React.useMemo(() => {
     const today = new Date();
@@ -492,6 +496,7 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
       } else {
         await addDoc(collection(db, 'workouts'), workoutData);
       }
+      setShowTimer(true);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'workouts');
     } finally {
@@ -630,6 +635,14 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
           )}
         </div>
       </div>
+
+      <RestTimerModal
+        isOpen={showTimer}
+        onClose={() => setShowTimer(false)}
+        restSeconds={restSeconds}
+        exerciseName={exercise}
+        intensity={intensity}
+      />
     </div>
   );
 }
