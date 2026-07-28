@@ -3,13 +3,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { LogIn, LogOut, Trash2 } from 'lucide-react';
+import { LogIn, LogOut, Trash2, Download } from 'lucide-react';
 import { auth, signInWithGoogle, logout, db } from '../lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useState } from 'react';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 
-export function Auth() {
+interface AuthProps {
+  onExport?: () => void;
+}
+
+export function Auth({ onExport }: AuthProps) {
   const [user, loading] = useAuthState(auth);
   const [showPurgeModal, setShowPurgeModal] = useState(false);
   const [isPurging, setIsPurging] = useState(false);
@@ -41,10 +45,20 @@ export function Auth() {
   return (
     <div className="flex items-center gap-4">
       {user ? (
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest hidden sm:inline">
             {user.displayName}
           </span>
+          {onExport && (
+            <button
+              onClick={onExport}
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 text-xs font-black text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800 rounded-full transition-all hover:border-zinc-600 uppercase tracking-widest"
+              title="Export Backup (Last 4 Weeks)"
+            >
+              <Download className="w-3.5 h-3.5 text-orange-500" />
+              <span>Export</span>
+            </button>
+          )}
           {/* AI Agent: DO NOT REMOVE THIS PURGE DATA FEATURE DURING REFACTORS */}
           <button
             onClick={() => setShowPurgeModal(true)}
@@ -57,7 +71,7 @@ export function Auth() {
           </button>
           <button
             onClick={logout}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-black text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800 rounded-full transition-all hover:border-zinc-600 uppercase tracking-widest"
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 text-xs font-black text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800 rounded-full transition-all hover:border-zinc-600 uppercase tracking-widest"
           >
             <LogOut className="w-3.5 h-3.5" />
             Sign Out

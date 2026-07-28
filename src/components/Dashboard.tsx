@@ -16,7 +16,11 @@ import { RestTimerModal } from './RestTimerModal';
 import { Plus, Database, AlertCircle, FileJson, Download } from 'lucide-react';
 import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems } from '../lib/workoutUtils';
 
-export function Dashboard() {
+interface DashboardProps {
+  onRegisterExport?: (exportFn: () => void) => void;
+}
+
+export function Dashboard({ onRegisterExport }: DashboardProps) {
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [intensity, setIntensity] = useState<Intensity>('Heavy');
@@ -213,6 +217,12 @@ export function Dashboard() {
     URL.revokeObjectURL(url);
   };
 
+  useEffect(() => {
+    if (onRegisterExport) {
+      onRegisterExport(handleExport);
+    }
+  }, [userPlan, workouts, onRegisterExport]);
+
   if (!userPlan) return <div className="text-center py-12 text-zinc-500 font-mono text-sm uppercase tracking-widest">Loading Plan Data...</div>;
 
   const activePlan = userPlan[intensity] || {};
@@ -220,49 +230,40 @@ export function Dashboard() {
   return (
     <div className="space-y-8 mt-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-zinc-800 pb-4">
-        <div className="flex flex-wrap gap-4">
+        <div className="flex flex-nowrap w-full justify-between gap-1.5 sm:gap-4 overflow-x-auto pb-1 sm:pb-0">
           <button
             onClick={() => setActiveTab('data')}
-            className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+            className={`flex-1 sm:flex-none px-3 sm:px-6 py-2.5 rounded-xl text-[11px] sm:text-xs font-black uppercase tracking-wider sm:tracking-widest transition-all text-center whitespace-nowrap ${
               activeTab === 'data' ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-900 text-zinc-500 hover:text-zinc-300'
             }`}
           >
-            Data Entry
+            Entry
           </button>
           <button
             onClick={() => setActiveTab('progress')}
-            className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+            className={`flex-1 sm:flex-none px-3 sm:px-6 py-2.5 rounded-xl text-[11px] sm:text-xs font-black uppercase tracking-wider sm:tracking-widest transition-all text-center whitespace-nowrap ${
               activeTab === 'progress' ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-900 text-zinc-500 hover:text-zinc-300'
             }`}
           >
-            Progress Review
+            Progress
           </button>
           <button
             onClick={() => setActiveTab('editor')}
-            className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+            className={`flex-1 sm:flex-none px-3 sm:px-6 py-2.5 rounded-xl text-[11px] sm:text-xs font-black uppercase tracking-wider sm:tracking-widest transition-all text-center whitespace-nowrap ${
               activeTab === 'editor' ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-900 text-zinc-500 hover:text-zinc-300'
             }`}
           >
-            Plan Editor
+            Editor
           </button>
           <button
             onClick={() => setActiveTab('logs')}
-            className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+            className={`flex-1 sm:flex-none px-3 sm:px-6 py-2.5 rounded-xl text-[11px] sm:text-xs font-black uppercase tracking-wider sm:tracking-widest transition-all text-center whitespace-nowrap ${
               activeTab === 'logs' ? 'bg-orange-500 text-white shadow-lg' : 'bg-zinc-900 text-zinc-500 hover:text-zinc-300'
             }`}
           >
             Logs
           </button>
         </div>
-        
-        <button
-           onClick={handleExport}
-           className="px-4 py-2 bg-zinc-900 border border-zinc-800 text-zinc-400 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 hover:text-white transition-colors flex items-center gap-2"
-           title="Export Backup (Last 4 Weeks)"
-        >
-           <Download className="w-4 h-4" />
-           <span className="hidden sm:inline">Export</span>
-        </button>
       </div>
 
       {activeTab === 'data' && (

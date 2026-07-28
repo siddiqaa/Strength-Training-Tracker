@@ -8,7 +8,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from './lib/firebase';
 import { Auth } from './components/Auth';
@@ -16,6 +16,11 @@ import { Dashboard } from './components/Dashboard';
 
 export default function App() {
   const [user, loading] = useAuthState(auth);
+  const [exportHandler, setExportHandler] = useState<(() => void) | null>(null);
+
+  const handleRegisterExport = useCallback((fn: () => void) => {
+    setExportHandler(() => fn);
+  }, []);
 
   if (loading) {
     return (
@@ -39,7 +44,7 @@ export default function App() {
           )}
         </div>
         <div className="flex-1 flex justify-center md:justify-end">
-          <Auth />
+          <Auth onExport={exportHandler ?? undefined} />
         </div>
       </header>
 
@@ -52,7 +57,7 @@ export default function App() {
             </div>
           </div>
         ) : (
-          <Dashboard />
+          <Dashboard onRegisterExport={handleRegisterExport} />
         )}
       </main>
     </div>
