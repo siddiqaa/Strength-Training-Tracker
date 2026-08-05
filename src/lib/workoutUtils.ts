@@ -109,6 +109,32 @@ export function calculateShowDeloadBadge(workouts: Pick<Workout, 'date'>[], now:
 /**
  * Checks if two dates represent the same local calendar day.
  */
+export function parseWorkoutDate(rawDate: any): number {
+  if (!rawDate) return Date.now();
+  if (typeof rawDate.toMillis === 'function') {
+    return rawDate.toMillis();
+  }
+  if (typeof rawDate.seconds === 'number') {
+    return rawDate.seconds * 1000;
+  }
+  if (typeof rawDate === 'number' && !isNaN(rawDate)) {
+    return rawDate;
+  }
+  if (rawDate instanceof Date) {
+    const time = rawDate.getTime();
+    return isNaN(time) ? Date.now() : time;
+  }
+  if (typeof rawDate === 'string') {
+    const time = new Date(rawDate).getTime();
+    return isNaN(time) ? Date.now() : time;
+  }
+  // For pending serverTimestamp() sentinel objects or unparseable objects
+  return Date.now();
+}
+
+/**
+ * Checks if two dates represent the same local calendar day.
+ */
 export function isSameDay(d1: Date | number, d2: Date | number): boolean {
   const date1 = typeof d1 === 'number' ? new Date(d1) : d1;
   const date2 = typeof d2 === 'number' ? new Date(d2) : d2;

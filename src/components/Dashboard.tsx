@@ -14,7 +14,7 @@ import { IntensityChart } from './IntensityChart';
 import { LogManager } from './LogManager';
 import { RestTimerModal } from './RestTimerModal';
 import { Plus, Database, AlertCircle, FileJson, Download } from 'lucide-react';
-import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems } from '../lib/workoutUtils';
+import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, parseWorkoutDate } from '../lib/workoutUtils';
 
 interface DashboardProps {
   onRegisterExport?: (exportFn: () => void) => void;
@@ -39,7 +39,7 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
         return {
           id: doc.id,
           ...d,
-          date: d.date?.toMillis ? d.date.toMillis() : (typeof d.date === 'number' ? d.date : (d.date ? new Date(d.date).getTime() : Date.now()))
+          date: parseWorkoutDate(d.date)
         } as Workout;
       });
       data.sort((a, b) => b.date - a.date);

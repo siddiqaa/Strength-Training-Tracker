@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise } from './workoutUtils';
+import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise, parseWorkoutDate } from './workoutUtils';
 import { Workout } from '../types';
 
 describe('createExerciseOrderItems', () => {
@@ -210,6 +210,36 @@ describe('getLastDayWorkoutForExercise', () => {
     // Overhead Press was logged on Jul 28, but not on Aug 4 (the last Heavy day)
     const result = getLastDayWorkoutForExercise(workouts, 'Overhead Press', 'Heavy');
     expect(result).toBeUndefined();
+  });
+});
+
+describe('parseWorkoutDate', () => {
+  it('should correctly parse Firestore Timestamp objects with toMillis', () => {
+    const fakeTimestamp = { toMillis: () => 1700000000000 };
+    expect(parseWorkoutDate(fakeTimestamp)).toBe(1700000000000);
+  });
+
+  it('should correctly parse seconds object', () => {
+    const fakeSeconds = { seconds: 1700000000 };
+    expect(parseWorkoutDate(fakeSeconds)).toBe(1700000000000);
+  });
+
+  it('should return number as is', () => {
+    expect(parseWorkoutDate(1700000000000)).toBe(1700000000000);
+  });
+
+  it('should handle pending serverTimestamp() sentinel objects without returning NaN', () => {
+    const before = Date.now();
+    const result = parseWorkoutDate({ _methodName: 'serverTimestamp' });
+    const after = Date.now();
+    expect(result).toBeGreaterThanOrEqual(before);
+    expect(result).toBeLessThanOrEqual(after);
+    expect(isNaN(result)).toBe(false);
+  });
+
+  it('should handle null/undefined without returning NaN', () => {
+    expect(isNaN(parseWorkoutDate(null))).toBe(false);
+    expect(isNaN(parseWorkoutDate(undefined))).toBe(false);
   });
 });
 

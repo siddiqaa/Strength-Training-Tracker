@@ -59,7 +59,7 @@ export function WorkoutHistory({ workouts, userPlan }: { workouts: Workout[], us
         </div>
         
         <div className="flex items-center gap-2 bg-zinc-900/50 border border-zinc-800 rounded-full px-3 py-1 self-start sm:self-center">
-          <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest whitespace-nowrap">Stagnation:</span>
+          <span className="text-[10px] font-black bg-cyan-400 text-zinc-950 px-1.5 py-0.5 rounded uppercase tracking-widest whitespace-nowrap">Stagnation:</span>
           <select 
             value={stagnationThreshold} 
             onChange={(e) => setStagnationThreshold(Number(e.target.value))}
