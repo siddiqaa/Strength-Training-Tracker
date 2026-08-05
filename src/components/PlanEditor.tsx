@@ -7,7 +7,7 @@ import autoTable from 'jspdf-autotable';
 
 interface PlanEditorProps {
   userPlan: UserPlan;
-  onSave: (newPlan: UserPlan) => Promise<void>;
+  onSave: (newPlan: UserPlan, switchTab?: boolean) => Promise<void>;
   onDeleteExercise?: (exercise: string) => Promise<void>;
 }
 
@@ -15,6 +15,8 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
   const [editedPlan, setEditedPlan] = useState<UserPlan>(userPlan);
   const [newExercise, setNewExercise] = useState('');
   const [error, setError] = useState('');
+  const [exerciseToDelete, setExerciseToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [exercises, setExercises] = useState<string[]>(() => {
     const allActive = new Set<string>();
@@ -100,32 +102,48 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
     }));
   };
 
-  const removeGlobalExercise = async (exercise: string) => {
-    if (!window.confirm(`Are you sure you want to delete "${exercise}"?\n\nThis will remove it from your plan AND permanently delete all workout logs for this exercise.`)) {
-      return;
-    }
+  const promptRemoveExercise = (exercise: string) => {
+    setExerciseToDelete(exercise);
+  };
 
-    if (onDeleteExercise) {
-      await onDeleteExercise(exercise);
-    }
+  const confirmDeleteExercise = async (exercise: string) => {
+    setIsDeleting(true);
+    try {
+      if (onDeleteExercise) {
+        await onDeleteExercise(exercise);
+      }
 
-    const newPlan = { ...editedPlan };
-    (['Heavy', 'Light', 'Medium'] as Intensity[]).forEach(int => {
-       const dayPlan = { ...newPlan[int] };
-       delete dayPlan[exercise];
-       newPlan[int] = dayPlan;
-    });
-    
-    // Also remove from order structures and metadata
-    const remainingExercises = exercises.filter(e => e !== exercise);
-    const updatedOrder = createExerciseOrderItems(remainingExercises);
-    newPlan.exerciseOrder = updatedOrder;
-    if (newPlan.exerciseMetadata?.[exercise]) {
-      delete newPlan.exerciseMetadata[exercise];
-    }
+      const newPlan = { ...editedPlan };
+      (['Heavy', 'Light', 'Medium'] as Intensity[]).forEach(int => {
+         const dayPlan = { ...newPlan[int] };
+         delete dayPlan[exercise];
+         newPlan[int] = dayPlan;
+      });
+      
+      // Also remove from order structures and metadata
+      const remainingExercises = exercises.filter(e => e !== exercise);
+      const updatedOrder = createExerciseOrderItems(remainingExercises);
+      newPlan.exerciseOrder = updatedOrder;
 
-    setEditedPlan(newPlan);
-    setExercises(remainingExercises);
+      if (newPlan.exerciseMetadata) {
+        const newMeta = { ...newPlan.exerciseMetadata };
+        delete newMeta[exercise];
+        newPlan.exerciseMetadata = newMeta;
+      }
+
+      setEditedPlan(newPlan);
+      setExercises(remainingExercises);
+
+      if (onSave) {
+        await onSave(newPlan, false);
+      }
+      setExerciseToDelete(null);
+    } catch (err) {
+      console.error('Failed to delete exercise:', err);
+      setError('Failed to delete exercise. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const moveExercise = (index: number, direction: -1 | 1) => {
@@ -409,7 +427,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                     </button>
                   </div>
                   <button 
-                    onClick={() => removeGlobalExercise(exercise)}
+                    onClick={() => promptRemoveExercise(exercise)}
                     className="p-2 text-zinc-500 hover:text-red-500 bg-zinc-900 border border-zinc-800 rounded-lg transition-colors"
                     title="Remove Exercise"
                   >
@@ -610,7 +628,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                           <ArrowDown className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => removeGlobalExercise(exercise)}
+                          onClick={() => promptRemoveExercise(exercise)}
                           className="p-1.5 text-zinc-500 hover:text-red-500 rounded-md hover:bg-red-500/10 transition-colors ml-2"
                           title="Remove Exercise entirely"
                         >
@@ -807,6 +825,48 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
         </table>
       </div>
     </div>
+
+    {exerciseToDelete && (
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+          <div className="flex items-center justify-between text-white">
+            <h3 className="text-lg font-black tracking-tight flex items-center gap-2 text-red-500">
+              <AlertCircle className="w-5 h-5" />
+              Delete Exercise
+            </h3>
+            <button 
+              onClick={() => setExerciseToDelete(null)}
+              className="text-zinc-500 hover:text-white transition-colors"
+              disabled={isDeleting}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <p className="text-sm text-zinc-300">
+            Are you sure you want to delete <span className="font-bold text-white">"{exerciseToDelete}"</span>?
+          </p>
+          <p className="text-xs text-zinc-400 bg-red-500/10 border border-red-500/20 p-3 rounded-xl text-red-300">
+            This will remove the exercise from your workout plan and permanently delete all logged workouts for this exercise.
+          </p>
+          <div className="flex gap-3 pt-2 justify-end">
+            <button 
+              onClick={() => setExerciseToDelete(null)}
+              disabled={isDeleting}
+              className="px-4 py-2 bg-zinc-800 text-zinc-300 text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-zinc-700 transition-colors"
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={() => confirmDeleteExercise(exerciseToDelete)}
+              disabled={isDeleting}
+              className="px-4 py-2 bg-red-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-red-500 transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete Exercise'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
   </div>
 );
 };

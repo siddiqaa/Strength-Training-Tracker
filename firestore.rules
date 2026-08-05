@@ -38,17 +38,17 @@ service cloud.firestore {
         && data.intensity in ['Heavy', 'Light', 'Medium']
         && (!('notes' in data) || data.notes == null || (data.notes is string && data.notes.size() <= 500))
         && (!('targetWeight' in data) || data.targetWeight == null || data.targetWeight is number)
-        && (!('targetReps' in data) || data.targetReps == null || data.targetReps is string)
+        && (!('targetReps' in data) || data.targetReps == null || data.targetReps is string || data.targetReps is number)
         && (!('targetSets' in data) || data.targetSets == null || data.targetSets is number)
         && (!('rpe' in data) || data.rpe == null || data.rpe in ['E', 'M', 'H'])
-        && data.date is timestamp;
+        && (data.date is timestamp || data.date is number);
     }
 
     match /workouts/{workoutId} {
       allow create: if isSignedIn() 
         && isValidWorkout(incoming())
         && incoming().keys().hasAll(['userId', 'exerciseName', 'weight', 'set1', 'set2', 'intensity', 'date'])
-        && incoming().keys().size() <= 13; // Including optional set3, notes, targets, rpe
+        && incoming().keys().size() <= 15; // Including optional set3, notes, targets, rpe
 
       allow read: if isOwner(resource.data.userId);
 

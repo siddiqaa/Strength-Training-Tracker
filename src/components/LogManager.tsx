@@ -13,16 +13,47 @@ export function LogManager({ workouts }: LogManagerProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Workout>>({});
+  const [editDateString, setEditDateString] = useState<string>('');
 
   const handleStartEdit = (workout: Workout) => {
     setEditingId(workout.id);
     setEditData({ ...workout });
+    if (workout.date) {
+      setEditDateString(format(new Date(workout.date), 'yyyy-MM-dd'));
+    } else {
+      setEditDateString(format(new Date(), 'yyyy-MM-dd'));
+    }
   };
 
   const handleSave = async (id: string) => {
     try {
       const workoutRef = doc(db, 'workouts', id);
-      const { id: _, ...updateValues } = editData;
+      const { id: _, userId: __, ...updateValues } = editData;
+
+      if (updateValues.weight !== undefined) updateValues.weight = Number(updateValues.weight);
+      if (updateValues.set1 !== undefined) updateValues.set1 = Number(updateValues.set1);
+      if (updateValues.set2 !== undefined) updateValues.set2 = Number(updateValues.set2);
+      if (updateValues.set3 !== undefined && updateValues.set3 !== null) {
+        updateValues.set3 = Number(updateValues.set3);
+      }
+
+      if (editDateString) {
+        const parts = editDateString.split('-').map(Number);
+        if (parts.length === 3 && !parts.some(isNaN)) {
+          const [year, month, day] = parts;
+          const origDate = editData.date ? new Date(editData.date) : new Date();
+          const newDateObj = new Date(
+            year,
+            month - 1,
+            day,
+            origDate.getHours() || 12,
+            origDate.getMinutes() || 0,
+            origDate.getSeconds() || 0
+          );
+          updateValues.date = newDateObj.getTime();
+        }
+      }
+
       await updateDoc(workoutRef, updateValues as any);
       setEditingId(null);
     } catch (error) {
@@ -81,10 +112,19 @@ export function LogManager({ workouts }: LogManagerProps) {
                 return (
                   <tr key={workout.id} className="hover:bg-zinc-900/30 transition-colors group">
                     <td className="p-4">
-                      <div className="flex items-center gap-2 text-zinc-400 text-sm font-medium">
-                        <Calendar className="w-3.5 h-3.5 text-zinc-600" />
-                        {displayDate}
-                      </div>
+                      {isEditing ? (
+                        <input
+                          type="date"
+                          value={editDateString}
+                          onChange={(e) => setEditDateString(e.target.value)}
+                          className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2 text-zinc-400 text-sm font-medium">
+                          <Calendar className="w-3.5 h-3.5 text-zinc-600" />
+                          {displayDate}
+                        </div>
+                      )}
                     </td>
                     <td className="p-4">
                       {isEditing ? (

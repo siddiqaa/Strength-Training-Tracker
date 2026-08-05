@@ -6,11 +6,19 @@ import { useEffect, useState } from 'react';
 import { db, auth, handleFirestoreError } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { Workout, OperationType } from '../types';
-import { getOrderedExerciseNames } from '../lib/workoutUtils';
+import { getOrderedExerciseNames, isSameDay } from '../lib/workoutUtils';
 import { History, Calendar } from 'lucide-react';
 
 export function WorkoutHistory({ workouts, userPlan }: { workouts: Workout[], userPlan?: any }) {
   const [stagnationThreshold, setStagnationThreshold] = useState(2);
+
+  const lastHeavyWorkout = workouts.find(w => w.intensity === 'Heavy');
+  const lastLightWorkout = workouts.find(w => w.intensity === 'Light');
+  const lastMediumWorkout = workouts.find(w => w.intensity === 'Medium');
+
+  const lastHeavyDate = lastHeavyWorkout ? new Date(lastHeavyWorkout.date) : null;
+  const lastLightDate = lastLightWorkout ? new Date(lastLightWorkout.date) : null;
+  const lastMediumDate = lastMediumWorkout ? new Date(lastMediumWorkout.date) : null;
 
   if (workouts.length === 0 && (!userPlan || Object.keys(userPlan).length === 0)) {
     return (
@@ -71,28 +79,28 @@ export function WorkoutHistory({ workouts, userPlan }: { workouts: Workout[], us
               <th className="p-1 pr-0 sm:p-2 border-b border-zinc-800 text-[8px] sm:text-[10px] font-black text-white uppercase tracking-widest align-bottom w-[25%] sm:w-auto">Exercise</th>
               <th className="p-2 border-b border-zinc-800 text-[9px] sm:text-[10px] font-black text-red-500 uppercase tracking-widest text-center align-bottom">
                 <div>Heavy</div>
-                {workouts.find(w => w.intensity === 'Heavy')?.date && (
+                {lastHeavyDate && (
                   <div className="text-[8px] text-zinc-600 mt-1 flex items-center justify-center gap-1">
                     <Calendar className="w-2.5 h-2.5" />
-                    {new Date(workouts.find(w => w.intensity === 'Heavy')!.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {lastHeavyDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </div>
                 )}
               </th>
               <th className="p-2 border-b border-zinc-800 text-[9px] sm:text-[10px] font-black text-blue-500 uppercase tracking-widest text-center align-bottom">
                 <div>Light</div>
-                {workouts.find(w => w.intensity === 'Light')?.date && (
+                {lastLightDate && (
                   <div className="text-[8px] text-zinc-600 mt-1 flex items-center justify-center gap-1">
                     <Calendar className="w-2.5 h-2.5" />
-                    {new Date(workouts.find(w => w.intensity === 'Light')!.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {lastLightDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </div>
                 )}
               </th>
               <th className="p-2 border-b border-zinc-800 text-[9px] sm:text-[10px] font-black text-orange-500 uppercase tracking-widest text-center align-bottom">
                 <div>Medium</div>
-                {workouts.find(w => w.intensity === 'Medium')?.date && (
+                {lastMediumDate && (
                   <div className="text-[8px] text-zinc-600 mt-1 flex items-center justify-center gap-1">
                     <Calendar className="w-2.5 h-2.5" />
-                    {new Date(workouts.find(w => w.intensity === 'Medium')!.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {lastMediumDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </div>
                 )}
               </th>
@@ -109,9 +117,9 @@ export function WorkoutHistory({ workouts, userPlan }: { workouts: Workout[], us
               const lightHistory = getHistory('Light');
               const mediumHistory = getHistory('Medium');
 
-              const heavy = heavyHistory[0];
-              const light = lightHistory[0];
-              const medium = mediumHistory[0];
+              const heavy = lastHeavyDate ? heavyHistory.find(w => isSameDay(w.date, lastHeavyDate)) : undefined;
+              const light = lastLightDate ? lightHistory.find(w => isSameDay(w.date, lastLightDate)) : undefined;
+              const medium = lastMediumDate ? mediumHistory.find(w => isSameDay(w.date, lastMediumDate)) : undefined;
 
               return (
                 <tr key={exercise} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">

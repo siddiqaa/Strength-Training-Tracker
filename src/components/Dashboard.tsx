@@ -39,7 +39,7 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
         return {
           id: doc.id,
           ...d,
-          date: d.date?.toMillis ? d.date.toMillis() : Date.now()
+          date: d.date?.toMillis ? d.date.toMillis() : (typeof d.date === 'number' ? d.date : (d.date ? new Date(d.date).getTime() : Date.now()))
         } as Workout;
       });
       data.sort((a, b) => b.date - a.date);
@@ -374,16 +374,15 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
               if (!auth.currentUser) return;
               const workoutsToDelete = workouts.filter(w => w.exerciseName === exercise);
               if (workoutsToDelete.length > 0) {
-                const batch = writeBatch(db);
-                let count = 0;
-                for (const w of workoutsToDelete) {
-                  if (w.id) {
-                    batch.delete(doc(db, 'workouts', w.id));
-                    count++;
+                const chunkSize = 500;
+                for (let i = 0; i < workoutsToDelete.length; i += chunkSize) {
+                  const chunk = workoutsToDelete.slice(i, i + chunkSize);
+                  const batch = writeBatch(db);
+                  for (const w of chunk) {
+                    if (w.id) {
+                      batch.delete(doc(db, 'workouts', w.id));
+                    }
                   }
-                  if (count === 500) break; // limit to one batch
-                }
-                if (count > 0) {
                   try {
                     await batch.commit();
                   } catch (error) {
@@ -392,7 +391,7 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
                 }
               }
             }}
-            onSave={async (newPlan) => {
+            onSave={async (newPlan, switchTab = true) => {
               if (!auth.currentUser) return;
               const path = `userPlans/${auth.currentUser.uid}`;
               try {
@@ -402,7 +401,9 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
                 delete (cleanPlan as any).order;
                 await setDoc(planRef, cleanPlan);
                 setUserPlan(cleanPlan);
-                setActiveTab('data');
+                if (switchTab) {
+                  setActiveTab('data');
+                }
               } catch (error) {
                 handleFirestoreError(error, OperationType.WRITE, path);
               }
@@ -525,7 +526,7 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
            [exercise]: {
              weight: Number(actualWt),
              sets: expectedSets,
-             reps: set1 !== '' ? String(set1) : target.reps,
+             reps: target.reps,
            }
          }
        };
@@ -537,7 +538,7 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
      }
   }
 
-  const isDiff = actualWt !== target.weight || (set1 !== '' && String(set1) !== (target.reps.split('-')[0] || target.reps));
+  const isDiff = Number(actualWt) !== target.weight;
 
   let calcWeight = null;
   const heavyPlanWeight = userPlan['Heavy']?.[exercise]?.weight;

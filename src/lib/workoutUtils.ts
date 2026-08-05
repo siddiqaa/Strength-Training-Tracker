@@ -105,3 +105,38 @@ export function calculateShowDeloadBadge(workouts: Pick<Workout, 'date'>[], now:
 
   return maxConsecutiveBreakDays < 6;
 }
+
+/**
+ * Checks if two dates represent the same local calendar day.
+ */
+export function isSameDay(d1: Date | number, d2: Date | number): boolean {
+  const date1 = typeof d1 === 'number' ? new Date(d1) : d1;
+  const date2 = typeof d2 === 'number' ? new Date(d2) : d2;
+  return (
+    date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate()
+  );
+}
+
+/**
+ * Returns the workout entry for a given exercise and intensity from the last relevant day for that intensity.
+ * If the exercise was skipped or not logged on that last day, returns undefined.
+ */
+export function getLastDayWorkoutForExercise(
+  workouts: Workout[],
+  exerciseName: string,
+  intensity: 'Heavy' | 'Light' | 'Medium'
+): Workout | undefined {
+  const lastIntensityWorkout = workouts.find(w => w.intensity === intensity);
+  if (!lastIntensityWorkout) return undefined;
+
+  const lastDayDate = new Date(lastIntensityWorkout.date);
+
+  return workouts.find(w =>
+    w.intensity === intensity &&
+    w.exerciseName === exerciseName &&
+    isSameDay(new Date(w.date), lastDayDate)
+  );
+}
+

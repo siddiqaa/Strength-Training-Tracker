@@ -4,7 +4,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples } from './workoutUtils';
+import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise } from './workoutUtils';
+import { Workout } from '../types';
 
 describe('createExerciseOrderItems', () => {
   it('should convert string array into position objects', () => {
@@ -174,3 +175,41 @@ describe('calculateShowDeloadBadge', () => {
     expect(calculateShowDeloadBadge(workouts, referenceNow)).toBe(true);
   });
 });
+
+describe('isSameDay', () => {
+  it('should return true for timestamps on the same calendar day', () => {
+    const d1 = new Date('2026-08-04T10:00:00').getTime();
+    const d2 = new Date('2026-08-04T18:30:00').getTime();
+    expect(isSameDay(d1, d2)).toBe(true);
+  });
+
+  it('should return false for timestamps on different calendar days', () => {
+    const d1 = new Date('2026-08-04T10:00:00').getTime();
+    const d2 = new Date('2026-07-28T10:00:00').getTime();
+    expect(isSameDay(d1, d2)).toBe(false);
+  });
+});
+
+describe('getLastDayWorkoutForExercise', () => {
+  const aug4Morning = new Date('2026-08-04T09:00:00').getTime();
+  const aug4Noon = new Date('2026-08-04T12:00:00').getTime();
+  const jul28Noon = new Date('2026-07-28T12:00:00').getTime();
+
+  const workouts: Workout[] = [
+    { id: '1', userId: 'u1', exerciseName: 'Bench Press', intensity: 'Heavy', weight: 100, set1: 8, set2: 8, set3: 8, targetWeight: 100, targetReps: '8', targetSets: 3, rpe: 'M', date: aug4Noon },
+    { id: '2', userId: 'u1', exerciseName: 'Squat', intensity: 'Heavy', weight: 140, set1: 8, set2: 8, set3: 8, targetWeight: 140, targetReps: '8', targetSets: 3, rpe: 'M', date: aug4Morning },
+    { id: '3', userId: 'u1', exerciseName: 'Overhead Press', intensity: 'Heavy', weight: 60, set1: 8, set2: 8, set3: 8, targetWeight: 60, targetReps: '8', targetSets: 3, rpe: 'M', date: jul28Noon },
+  ];
+
+  it('should return the workout from the last relevant day (Aug 4)', () => {
+    const result = getLastDayWorkoutForExercise(workouts, 'Bench Press', 'Heavy');
+    expect(result?.id).toBe('1');
+  });
+
+  it('should return undefined if an exercise was skipped on the last relevant day (Aug 4)', () => {
+    // Overhead Press was logged on Jul 28, but not on Aug 4 (the last Heavy day)
+    const result = getLastDayWorkoutForExercise(workouts, 'Overhead Press', 'Heavy');
+    expect(result).toBeUndefined();
+  });
+});
+
