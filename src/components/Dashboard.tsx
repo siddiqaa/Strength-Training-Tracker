@@ -360,9 +360,9 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
       
       {activeTab === 'progress' && (
         <div className="space-y-8 mt-4">
-          <ProgressChart workouts={workouts} userPlan={userPlan} />
-          <IntensityChart workouts={workouts} userPlan={userPlan} />
           <WorkoutHistory workouts={workouts} userPlan={userPlan} />
+          <IntensityChart workouts={workouts} userPlan={userPlan} />
+          <ProgressChart workouts={workouts} userPlan={userPlan} />
         </div>
       )}
       
@@ -441,10 +441,11 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
     return workouts.find(w => {
       const wDate = new Date(w.date);
       return w.exerciseName === exercise && 
+             w.intensity === intensity &&
              wDate >= today && 
              wDate < tomorrow;
     });
-  }, [workouts, exercise]);
+  }, [workouts, exercise, intensity]);
 
   const lastWorkout = React.useMemo(() => {
     return workouts.find(w => w.exerciseName === exercise && w.intensity === intensity);
