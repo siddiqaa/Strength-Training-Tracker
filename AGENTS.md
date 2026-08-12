@@ -18,8 +18,8 @@
 - **`PlanEditor.tsx`**: Interface for users to edit their workout plans visually or via raw JSON modal editor.
 - **`LogManager.tsx`**: Table-based view for viewing, filtering, and deleting past workout logs.
 - **`WorkoutHistory.tsx`**: Training Archive section displaying log history and stagnation criteria with Cyan 400 badge styling.
-- **`IntensityChart.tsx`**: Intensity Tracker section visualizing progression (Weight/RPE) grouped by Intensity level (`Heavy`, `Medium`, `Light`).
-- **`ProgressChart.tsx`**: Progress Tracker section visualizing progression (Weight/RPE) grouped by specific Exercise.
+- **`IntensityChart.tsx`**: Intensity Tracker section visualizing progression (Weight/RPE) across Heavy, Medium, and Light intensities in a 3-column grid layout (single column on mobile), with a desktop-only full-width expand toggle on each chart and single-point hover tooltips.
+- **`ProgressChart.tsx`**: Progress Tracker section visualizing progression (Weight/RPE) across all exercises in a 2-column grid layout (single column on mobile), with a desktop-only full-width expand toggle on each chart.
 - **`RestTimerModal.tsx`**: Modal for rest countdown timer with sound notifications, backdrop click and ESC key dismiss support without cancelling saved logs.
 - **`workoutUtils.ts` & `workoutUtils.test.ts`**: Utilities for parsing Firestore dates safely (`parseWorkoutDate`), date comparison (`isSameDay`), deload calculation, exercise ordering, and unit tests.
 
