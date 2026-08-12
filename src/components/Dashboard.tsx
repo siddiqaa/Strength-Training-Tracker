@@ -328,7 +328,7 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
             <div className="hidden md:grid grid-cols-12 gap-4 px-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">
               <div className="col-span-3">Exercise</div>
               <div className="col-span-2 text-center">Target (Wt)</div>
-              <div className="col-span-5 text-center">Actual (Wt / Set / Rep)</div>
+              <div className="col-span-5 text-center">Actual (Wt / Set / RPE)</div>
               <div className="col-span-2 text-center">Action</div>
             </div>
             
