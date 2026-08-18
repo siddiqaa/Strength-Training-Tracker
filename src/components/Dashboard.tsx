@@ -14,7 +14,7 @@ import { IntensityChart } from './IntensityChart';
 import { LogManager } from './LogManager';
 import { RestTimerModal } from './RestTimerModal';
 import { Plus, Database, AlertCircle, FileJson, Download } from 'lucide-react';
-import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, parseWorkoutDate } from '../lib/workoutUtils';
+import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, parseWorkoutDate, isSameDay } from '../lib/workoutUtils';
 
 interface DashboardProps {
   onRegisterExport?: (exportFn: () => void) => void;
@@ -35,7 +35,7 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => {
-        const d = doc.data();
+        const d = doc.data({ serverTimestamps: 'estimate' });
         return {
           id: doc.id,
           ...d,
@@ -344,7 +344,7 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
                 if (!target) return null;
                 return (
                   <PlanRow 
-                    key={exercise} 
+                    key={`${intensity}-${exercise}`} 
                     exercise={exercise} 
                     target={target} 
                     intensity={intensity} 
@@ -422,7 +422,7 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
 }
 
 const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, userPlan: UserPlan, workouts: Workout[] }> = ({ exercise, target, intensity, userPlan, workouts }) => {
-  const [actualWt, setActualWt] = useState<string | number>(target.weight);
+  const [actualWt, setActualWt] = useState<string | number>(() => target?.weight !== undefined ? target.weight : '');
   const [set1, set1Reps] = useState<string | number>('');
   const [set2, set2Reps] = useState<string | number>('');
   const [set3, set3Reps] = useState<string | number>('');
@@ -433,18 +433,11 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
   const restSeconds = userPlan.dayMetadata?.[intensity]?.restPeriod ?? 90;
 
   const todayWorkout = React.useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    return workouts.find(w => {
-      const wDate = new Date(w.date);
-      return w.exerciseName === exercise && 
-             w.intensity === intensity &&
-             wDate >= today && 
-             wDate < tomorrow;
-    });
+    return workouts.find(w => 
+      w.exerciseName === exercise && 
+      w.intensity === intensity && 
+      isSameDay(w.date, new Date())
+    );
   }, [workouts, exercise, intensity]);
 
   const lastWorkout = React.useMemo(() => {
@@ -467,19 +460,19 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
 
   useEffect(() => {
     if (todayWorkout) {
-      setActualWt(todayWorkout.weight !== undefined && todayWorkout.weight !== null ? todayWorkout.weight : target.weight);
+      setActualWt(todayWorkout.weight !== undefined && todayWorkout.weight !== null ? todayWorkout.weight : (target?.weight ?? ''));
       set1Reps(todayWorkout.set1 !== undefined && todayWorkout.set1 !== null && todayWorkout.set1 !== 0 ? todayWorkout.set1 : '');
       set2Reps(todayWorkout.set2 !== undefined && todayWorkout.set2 !== null && todayWorkout.set2 !== 0 ? todayWorkout.set2 : '');
       set3Reps(todayWorkout.set3 !== undefined && todayWorkout.set3 !== null && todayWorkout.set3 !== 0 ? todayWorkout.set3 : '');
       setRpe(todayWorkout.rpe || 'M');
-    } else {
-      setActualWt(target.weight);
-      set1Reps('');
-      set2Reps('');
-      set3Reps('');
-      setRpe('M');
     }
-  }, [target, todayWorkout]);
+  }, [todayWorkout]);
+
+  useEffect(() => {
+    if (!todayWorkout && target?.weight !== undefined && (actualWt === '' || actualWt === undefined)) {
+      setActualWt(target.weight);
+    }
+  }, [target?.weight, todayWorkout]);
 
   const expectedSets = target.sets || 3;
 
@@ -487,18 +480,24 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
     if (!auth.currentUser) return;
     setIsLogging(true);
     try {
+      const parsedWeight = typeof actualWt === 'number' ? actualWt : (actualWt === '' ? 0 : Number(actualWt));
+      const s1 = set1 !== '' ? Number(set1) : 0;
+      const s2 = set2 !== '' ? Number(set2) : 0;
+      const s3 = set3 !== '' ? Number(set3) : 0;
+      const safeWeight = isNaN(parsedWeight) ? 0 : parsedWeight;
+
       const workoutData = {
         userId: auth.currentUser.uid,
         exerciseName: exercise,
-        weight: Number(actualWt),
-        set1: set1 !== '' ? Number(set1) : 0,
-        set2: set2 !== '' ? Number(set2) : 0,
-        ...(expectedSets >= 3 ? { set3: set3 !== '' ? Number(set3) : 0 } : {}),
+        weight: safeWeight,
+        set1: isNaN(s1) ? 0 : s1,
+        set2: isNaN(s2) ? 0 : s2,
+        ...(expectedSets >= 3 ? { set3: isNaN(s3) ? 0 : s3 } : {}),
         intensity,
-        targetWeight: target.weight,
-        targetReps: target.reps,
-        targetSets: expectedSets,
-        rpe,
+        targetWeight: target?.weight !== undefined ? Number(target.weight) : safeWeight,
+        targetReps: target?.reps !== undefined ? String(target.reps) : '8',
+        targetSets: expectedSets || 3,
+        rpe: rpe || 'M',
         date: serverTimestamp(),
       };
 
