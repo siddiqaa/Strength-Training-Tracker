@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Workout, OperationType } from '../types';
 import { db, handleFirestoreError } from '../lib/firebase';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { Trash2, Edit2, Check, X, Calendar, Dumbbell, Hash, Target } from 'lucide-react';
+import { Trash2, Edit2, Check, X, Calendar, Dumbbell, Hash, Target, ChevronUp, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface LogManagerProps {
@@ -14,6 +14,29 @@ export function LogManager({ workouts }: LogManagerProps) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Workout>>({});
   const [editDateString, setEditDateString] = useState<string>('');
+  const [sortField, setSortField] = useState<'date' | 'exerciseName'>('date');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const handleSort = (field: 'date' | 'exerciseName') => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const sortedWorkouts = [...workouts].sort((a, b) => {
+    let comparison = 0;
+    if (sortField === 'date') {
+      const dateA = a.date ? new Date(a.date).getTime() : 0;
+      const dateB = b.date ? new Date(b.date).getTime() : 0;
+      comparison = dateA - dateB;
+    } else {
+      comparison = (a.exerciseName || '').localeCompare(b.exerciseName || '');
+    }
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
 
   const handleStartEdit = (workout: Workout) => {
     setEditingId(workout.id);
@@ -96,8 +119,28 @@ export function LogManager({ workouts }: LogManagerProps) {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                <th className="p-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Date</th>
-                <th className="p-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Exercise</th>
+                <th 
+                  className="p-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
+                  onClick={() => handleSort('date')}
+                >
+                  <div className="flex items-center gap-1">
+                    Date
+                    {sortField === 'date' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="p-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
+                  onClick={() => handleSort('exerciseName')}
+                >
+                  <div className="flex items-center gap-1">
+                    Exercise
+                    {sortField === 'exerciseName' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                    )}
+                  </div>
+                </th>
                 <th className="p-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">Sets/Reps</th>
                 <th className="p-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">Weight</th>
                 <th className="p-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">RPE</th>
@@ -105,7 +148,7 @@ export function LogManager({ workouts }: LogManagerProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/50">
-              {workouts.map((workout) => {
+              {sortedWorkouts.map((workout) => {
                 const isEditing = editingId === workout.id;
                 const displayDate = workout.date ? format(new Date(workout.date), 'MMM dd, yyyy') : 'No Date';
 

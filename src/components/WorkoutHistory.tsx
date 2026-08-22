@@ -148,7 +148,22 @@ function TableCell({ workout, history, threshold }: { workout?: Workout, history
 
   const isStagnant = history.length >= threshold && history.slice(0, threshold).every((w, i, arr) => {
     if (i === arr.length - 1) return true;
-    return w.weight <= arr[i+1].weight;
+    const prev = arr[i+1];
+    
+    // Weight must be same or less than previous session
+    const weightSameOrLess = w.weight <= prev.weight;
+    
+    // Calculate total reps for comparison
+    const wTotal = (w.set1 || 0) + (w.set2 || 0) + (w.set3 || 0);
+    const pTotal = (prev.set1 || 0) + (prev.set2 || 0) + (prev.set3 || 0);
+    
+    // Reps must be same or less than previous session
+    const repsSameOrLess = wTotal <= pTotal;
+
+    // Stagnation occurs if neither weight nor reps improved.
+    // This also naturally includes cases where the user hit the target (weight and reps) 
+    // but stayed there for multiple sessions instead of progressing.
+    return weightSameOrLess && repsSameOrLess;
   });
 
   let weightColor = 'text-white';
