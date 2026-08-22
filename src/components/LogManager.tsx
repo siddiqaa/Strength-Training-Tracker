@@ -163,8 +163,18 @@ export function LogManager({ workouts }: LogManagerProps) {
                           className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500"
                         />
                       ) : (
-                        <div className="flex items-center gap-2 text-zinc-400 text-sm font-medium">
-                          <Calendar className="w-3.5 h-3.5 text-zinc-600" />
+                        <div className={`flex items-center gap-2 text-sm font-bold ${
+                          workout.intensity === 'Heavy' ? 'text-red-500' :
+                          workout.intensity === 'Light' ? 'text-blue-500' :
+                          workout.intensity === 'Medium' ? 'text-orange-500' :
+                          'text-zinc-400'
+                        }`}>
+                          <Calendar className={`w-3.5 h-3.5 ${
+                            workout.intensity === 'Heavy' ? 'text-red-500/50' :
+                            workout.intensity === 'Light' ? 'text-blue-500/50' :
+                            workout.intensity === 'Medium' ? 'text-orange-500/50' :
+                            'text-zinc-600'
+                          }`} />
                           {displayDate}
                         </div>
                       )}
