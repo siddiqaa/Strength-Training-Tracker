@@ -108,14 +108,18 @@ export function WorkoutHistory({ workouts, userPlan }: { workouts: Workout[], us
           </thead>
           <tbody>
             {exercises.map(exercise => {
-              const getHistory = (intensity: 'Heavy' | 'Light' | 'Medium') => 
+              const getHistoryForIntensity = (intensity: 'Heavy' | 'Light' | 'Medium') => 
                 workouts
                   .filter(w => w.exerciseName === exercise && w.intensity === intensity)
-                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                  .sort((a, b) => {
+                    const dateA = typeof a.date === 'number' ? a.date : new Date(a.date).getTime();
+                    const dateB = typeof b.date === 'number' ? b.date : new Date(b.date).getTime();
+                    return dateB - dateA;
+                  });
 
-              const heavyHistory = getHistory('Heavy');
-              const lightHistory = getHistory('Light');
-              const mediumHistory = getHistory('Medium');
+              const heavyHistory = getHistoryForIntensity('Heavy');
+              const lightHistory = getHistoryForIntensity('Light');
+              const mediumHistory = getHistoryForIntensity('Medium');
 
               const heavy = lastHeavyDate ? heavyHistory.find(w => isSameDay(w.date, lastHeavyDate)) : undefined;
               const light = lastLightDate ? lightHistory.find(w => isSameDay(w.date, lastLightDate)) : undefined;
@@ -146,23 +150,25 @@ export function WorkoutHistory({ workouts, userPlan }: { workouts: Workout[], us
 function TableCell({ workout, history, threshold }: { workout?: Workout, history: Workout[], threshold: number }) {
   if (!workout) return <div className="text-zinc-700 text-xs font-mono text-center py-2">-</div>;
 
+  // Stagnation is calculated strictly within the history of the same intensity.
+  // The 'threshold' represents the total number of sessions to include in the lookback.
+  // Threshold 2: compares Current vs Previous (1 interval)
+  // Threshold 3: compares Current vs Previous AND Previous vs Previous-1 (2 intervals)
   const isStagnant = history.length >= threshold && history.slice(0, threshold).every((w, i, arr) => {
     if (i === arr.length - 1) return true;
     const prev = arr[i+1];
     
-    // Weight must be same or less than previous session
-    const weightSameOrLess = w.weight <= prev.weight;
+    // Weight must be same or less than previous session of the SAME intensity
+    const weightSameOrLess = Number(w.weight) <= Number(prev.weight);
     
-    // Calculate total reps for comparison
-    const wTotal = (w.set1 || 0) + (w.set2 || 0) + (w.set3 || 0);
-    const pTotal = (prev.set1 || 0) + (prev.set2 || 0) + (prev.set3 || 0);
+    // Calculate total reps for comparison within same intensity
+    const wTotal = (Number(w.set1) || 0) + (Number(w.set2) || 0) + (Number(w.set3) || 0);
+    const pTotal = (Number(prev.set1) || 0) + (Number(prev.set2) || 0) + (Number(prev.set3) || 0);
     
-    // Reps must be same or less than previous session
+    // Reps must be same or less than previous session of the SAME intensity
     const repsSameOrLess = wTotal <= pTotal;
 
-    // Stagnation occurs if neither weight nor reps improved.
-    // This also naturally includes cases where the user hit the target (weight and reps) 
-    // but stayed there for multiple sessions instead of progressing.
+    // Stagnation for this step is true if neither weight nor reps improved compared to the session before it.
     return weightSameOrLess && repsSameOrLess;
   });
 

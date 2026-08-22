@@ -107,11 +107,6 @@ export function LogManager({ workouts }: LogManagerProps) {
           <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Log Management</h2>
           <p className="text-zinc-500 text-sm">Review, edit, or remove individual performance entries.</p>
         </div>
-        <div className="px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-full">
-          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-            {workouts.length} Total Entries
-          </span>
-        </div>
       </div>
 
       <div className="bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden">
@@ -120,7 +115,7 @@ export function LogManager({ workouts }: LogManagerProps) {
             <thead>
               <tr className="border-b border-zinc-800 bg-zinc-900/50">
                 <th 
-                  className="p-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
+                  className="p-2 sm:p-4 text-[8px] sm:text-[10px] font-black text-zinc-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
                   onClick={() => handleSort('date')}
                 >
                   <div className="flex items-center gap-1">
@@ -131,7 +126,7 @@ export function LogManager({ workouts }: LogManagerProps) {
                   </div>
                 </th>
                 <th 
-                  className="p-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
+                  className="p-2 sm:p-4 text-[8px] sm:text-[10px] font-black text-zinc-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
                   onClick={() => handleSort('exerciseName')}
                 >
                   <div className="flex items-center gap-1">
@@ -141,10 +136,10 @@ export function LogManager({ workouts }: LogManagerProps) {
                     )}
                   </div>
                 </th>
-                <th className="p-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">Sets/Reps</th>
-                <th className="p-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">Weight</th>
-                <th className="p-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">RPE</th>
-                <th className="p-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest text-right">Actions</th>
+                <th className="p-2 sm:p-4 text-[8px] sm:text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">Sets/Reps</th>
+                <th className="p-2 sm:p-4 text-[8px] sm:text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">Weight</th>
+                <th className="p-2 sm:p-4 text-[8px] sm:text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">RPE</th>
+                <th className="p-2 sm:p-4 text-[8px] sm:text-[10px] font-black text-zinc-500 uppercase tracking-widest text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/50">
@@ -154,7 +149,7 @@ export function LogManager({ workouts }: LogManagerProps) {
 
                 return (
                   <tr key={workout.id} className="hover:bg-zinc-900/30 transition-colors group">
-                    <td className="p-4">
+                    <td className="p-2 sm:p-4">
                       {isEditing ? (
                         <input
                           type="date"
@@ -163,23 +158,23 @@ export function LogManager({ workouts }: LogManagerProps) {
                           className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500"
                         />
                       ) : (
-                        <div className={`flex items-center gap-2 text-sm font-bold ${
+                        <div className={`flex items-center gap-1 sm:gap-2 text-[10px] sm:text-sm font-bold ${
                           workout.intensity === 'Heavy' ? 'text-red-500' :
                           workout.intensity === 'Light' ? 'text-blue-500' :
                           workout.intensity === 'Medium' ? 'text-orange-500' :
                           'text-zinc-400'
                         }`}>
-                          <Calendar className={`w-3.5 h-3.5 ${
+                          <Calendar className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${
                             workout.intensity === 'Heavy' ? 'text-red-500/50' :
                             workout.intensity === 'Light' ? 'text-blue-500/50' :
                             workout.intensity === 'Medium' ? 'text-orange-500/50' :
                             'text-zinc-600'
                           }`} />
-                          {displayDate}
+                          <span className="whitespace-nowrap">{displayDate}</span>
                         </div>
                       )}
                     </td>
-                    <td className="p-4">
+                    <td className="p-2 sm:p-4">
                       {isEditing ? (
                         <input
                           type="text"
@@ -188,13 +183,13 @@ export function LogManager({ workouts }: LogManagerProps) {
                           className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-blue-500 w-full"
                         />
                       ) : (
-                        <div className="flex items-center gap-2">
-                          <Dumbbell className="w-3.5 h-3.5 text-blue-500/50" />
-                          <span className="text-white font-bold text-sm">{workout.exerciseName}</span>
+                        <div className="flex items-center gap-1 sm:gap-2">
+                          <Dumbbell className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-500/50 hidden xs:block" />
+                          <span className="text-white font-bold text-[10px] sm:text-sm line-clamp-1">{workout.exerciseName}</span>
                         </div>
                       )}
                     </td>
-                    <td className="p-4 text-center">
+                    <td className="p-2 sm:p-4 text-center">
                       {isEditing ? (
                         <div className="flex items-center justify-center gap-1">
                           <input
@@ -220,7 +215,7 @@ export function LogManager({ workouts }: LogManagerProps) {
                           />
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center gap-1.5 text-sm font-mono text-white">
+                        <div className="flex items-center justify-center gap-1 text-[10px] sm:text-sm font-mono text-white">
                           <span>{workout.set1}</span>
                           <span className="text-zinc-600">/</span>
                           <span>{workout.set2}</span>
@@ -233,7 +228,7 @@ export function LogManager({ workouts }: LogManagerProps) {
                         </div>
                       )}
                     </td>
-                    <td className="p-4 text-center">
+                    <td className="p-2 sm:p-4 text-center">
                       {isEditing ? (
                         <input
                           type="number"
@@ -242,13 +237,13 @@ export function LogManager({ workouts }: LogManagerProps) {
                           className="w-16 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-center text-xs text-white mx-auto"
                         />
                       ) : (
-                        <div className="flex items-center justify-center gap-1 text-sm">
+                        <div className="flex items-center justify-center gap-0.5 sm:gap-1 text-[10px] sm:text-sm">
                           <span className="text-white font-mono">{workout.weight}</span>
-                          <span className="text-zinc-600 text-[10px] uppercase font-black">Lbs</span>
+                          <span className="text-zinc-600 text-[8px] sm:text-[10px] uppercase font-black">Lbs</span>
                         </div>
                       )}
                     </td>
-                    <td className="p-4 text-center">
+                    <td className="p-2 sm:p-4 text-center">
                       {isEditing ? (
                         <select
                           value={editData.rpe || 'M'}
@@ -260,7 +255,7 @@ export function LogManager({ workouts }: LogManagerProps) {
                           <option value="H">Hard</option>
                         </select>
                       ) : (
-                        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-mono text-xs ${
+                        <div className={`inline-flex items-center gap-1 px-1 sm:px-2 py-0.5 rounded font-mono text-[8px] sm:text-xs ${
                           workout.rpe === 'E' ? 'bg-green-500/10 border border-green-500/20 text-green-500' :
                           workout.rpe === 'M' ? 'bg-yellow-500/10 border border-yellow-500/20 text-yellow-500' :
                           'bg-red-500/10 border border-red-500/20 text-red-500'
@@ -269,46 +264,46 @@ export function LogManager({ workouts }: LogManagerProps) {
                         </div>
                       )}
                     </td>
-                    <td className="p-4">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="p-2 sm:p-4">
+                      <div className="flex items-center justify-end gap-1 sm:gap-2">
                         {isEditing ? (
                           <>
                             <button
                               onClick={() => handleSave(workout.id)}
-                              className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                              className="p-1 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors"
                               title="Save Changes"
                             >
-                              <Check className="w-4 h-4" />
+                              <Check className="w-3 h-3 sm:w-4 sm:h-4" />
                             </button>
                             <button
                               onClick={() => setEditingId(null)}
-                              className="p-1.5 text-zinc-500 hover:bg-zinc-800 rounded-lg transition-colors"
+                              className="p-1 text-zinc-500 hover:bg-zinc-800 rounded-lg transition-colors"
                               title="Cancel"
                             >
-                              <X className="w-4 h-4" />
+                              <X className="w-3 h-3 sm:w-4 sm:h-4" />
                             </button>
                           </>
                         ) : (
                           <>
                             <button
                               onClick={() => handleStartEdit(workout)}
-                              className="p-1.5 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+                              className="p-1 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
                               title="Edit Log"
                             >
-                              <Edit2 className="w-4 h-4" />
+                              <Edit2 className="w-3 h-3 sm:w-4 sm:h-4" />
                             </button>
                             <button
                               onClick={() => handleDelete(workout.id)}
-                              className={`p-1.5 rounded-lg transition-all flex items-center gap-1 ${
+                              className={`p-1 rounded-lg transition-all flex items-center gap-1 ${
                                 confirmDeleteId === workout.id 
-                                  ? 'bg-red-500 text-white px-2' 
+                                  ? 'bg-red-500 text-white px-1.5' 
                                   : 'text-zinc-500 hover:text-red-500 hover:bg-red-500/10'
                               }`}
                               title={confirmDeleteId === workout.id ? "Click again to confirm" : "Delete Log"}
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                               {confirmDeleteId === workout.id && (
-                                <span className="text-[10px] font-black uppercase tracking-tighter">Confirm?</span>
+                                <span className="text-[8px] font-black uppercase tracking-tighter">Confirm?</span>
                               )}
                             </button>
                           </>
