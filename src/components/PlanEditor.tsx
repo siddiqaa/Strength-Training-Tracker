@@ -193,7 +193,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
   };
 
   const generatePDF = () => {
-    const doc = new jsPDF('landscape');
+    const doc = new jsPDF('portrait');
     
     doc.setFontSize(18);
     doc.setTextColor(40, 40, 40);
@@ -340,7 +340,12 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
       });
     }
 
-    doc.save('hlm-strength-plan.pdf');
+    const date = new Date();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const yy = String(date.getFullYear()).slice(-2);
+    const filename = `HLMPlan_${mm}${dd}${yy}.PDF`;
+    doc.save(filename);
   };
 
   return (

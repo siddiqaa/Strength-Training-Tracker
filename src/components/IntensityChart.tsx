@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Workout, Intensity } from '../types';
-import { getOrderedExerciseNames } from '../lib/workoutUtils';
+import { getOrderedExerciseNames, isGoalAchieved } from '../lib/workoutUtils';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Activity, Maximize2, Minimize2 } from 'lucide-react';
 
@@ -46,6 +46,7 @@ const CustomIntensityTooltip = ({ active, payload, hoveredExercise, mouseYRatio 
   const exerciseName = selectedItem.name || selectedItem.dataKey;
   const weight = selectedItem.value;
   const rpe = selectedItem.payload?.[`${exerciseName}_rpe`];
+  const ga = selectedItem.payload?.[`${exerciseName}_ga`];
 
   let weightColorClass = 'text-orange-400';
   if (rpe === 'E') weightColorClass = 'text-green-500';
@@ -54,7 +55,12 @@ const CustomIntensityTooltip = ({ active, payload, hoveredExercise, mouseYRatio 
 
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 shadow-xl z-[1000] flex flex-col gap-0.5 min-w-[120px]">
-      <div className="text-xs font-bold text-white tracking-tight">{exerciseName}</div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs font-bold text-white tracking-tight">{exerciseName}</div>
+        {ga && (
+          <span className="text-[8px] font-black bg-emerald-500/20 text-emerald-500 px-1 rounded uppercase tracking-tighter">GA</span>
+        )}
+      </div>
       <div className={`text-xs font-mono font-bold ${weightColorClass}`}>{weight} lbs</div>
     </div>
   );
@@ -91,6 +97,7 @@ const SingleIntensityChart: React.FC<{
       const entry = dataByDate.get(dateStr);
       entry[w.exerciseName] = w.weight;
       entry[`${w.exerciseName}_rpe`] = w.rpe;
+      entry[`${w.exerciseName}_ga`] = isGoalAchieved(w);
     });
 
     return Array.from(dataByDate.values()).sort((a, b) => a.timestamp - b.timestamp);
@@ -100,7 +107,7 @@ const SingleIntensityChart: React.FC<{
     const exercises = new Set<string>();
     chartData.forEach(d => {
       Object.keys(d).forEach(k => {
-        if (k !== 'date' && k !== 'timestamp' && !k.endsWith('_rpe')) {
+        if (k !== 'date' && k !== 'timestamp' && !k.endsWith('_rpe') && !k.endsWith('_ga')) {
           exercises.add(k);
         }
       });
@@ -123,11 +130,22 @@ const SingleIntensityChart: React.FC<{
     if (value === undefined || value === null) return null;
 
     const rpe = payload[`${dataKey}_rpe`];
+    const ga = payload[`${dataKey}_ga`];
     
     let fill = '#18181b';
-    if (rpe === 'E') fill = '#22c55e'; // green-500
-    else if (rpe === 'M') fill = '#eab308'; // yellow-500
-    else if (rpe === 'H') fill = '#ef4444'; // red-500
+    const rpeColors = {
+      E: '#22c55e',
+      M: '#eab308',
+      H: '#ef4444'
+    };
+    
+    const rpeColor = rpeColors[rpe as keyof typeof rpeColors] || '#f97316';
+    
+    if (ga) {
+      fill = rpeColor;
+    } else {
+      fill = '#18181b'; // Empty look
+    }
 
     return (
       <circle 
@@ -135,7 +153,7 @@ const SingleIntensityChart: React.FC<{
         cy={cy} 
         r={4} 
         fill={fill} 
-        stroke={stroke} 
+        stroke={rpeColor} 
         strokeWidth={2}
         onMouseEnter={() => setHoveredExercise(dataKey)}
         style={{ cursor: 'pointer' }}

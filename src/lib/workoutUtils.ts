@@ -166,3 +166,31 @@ export function getLastDayWorkoutForExercise(
   );
 }
 
+/**
+ * Calculates if the goal was achieved for a workout entry.
+ * Goal Achieved (GA) = true if each set logged meets or exceeds the target reps across the target sets.
+ */
+export function isGoalAchieved(workout: Workout): boolean {
+  const targetSets = workout.targetSets || 0;
+  const targetRepsStr = workout.targetReps || '';
+  
+  if (targetSets === 0 || !targetRepsStr) return false;
+
+  const repMatch = targetRepsStr.match(/\d+/);
+  if (!repMatch) return false;
+  const targetRepsValue = parseInt(repMatch[0], 10);
+
+  // Check the sets that were actually targetted
+  const set1 = Number(workout.set1) || 0;
+  const set2 = Number(workout.set2) || 0;
+  const set3 = Number(workout.set3) || 0;
+  
+  const sets = [set1, set2, set3];
+  
+  for (let i = 0; i < targetSets; i++) {
+    if ((sets[i] || 0) < targetRepsValue) return false;
+  }
+  
+  return true;
+}
+
