@@ -179,11 +179,6 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
   return (
     <div 
       className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
     >
       <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center relative shadow-2xl flex flex-col items-center gap-6">
         {/* Manual Resync Clock Button */}
