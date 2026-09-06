@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Workout, ExerciseOrderItem } from '../types';
+import { Workout, ExerciseOrderItem, Intensity, UserPlan } from '../types';
 
 export { type ExerciseOrderItem };
 
@@ -192,5 +192,49 @@ export function isGoalAchieved(workout: Workout): boolean {
   }
   
   return true;
+}
+
+/**
+ * Checks if an exercise has Bodyweight (BW) as its target weight.
+ */
+export function isBWTarget(
+  exerciseName?: string, 
+  intensity?: Intensity, 
+  userPlan?: UserPlan, 
+  workout?: Workout
+): boolean {
+  if (workout?.isBW) return true;
+  if (!exerciseName) return false;
+  if (userPlan && intensity && userPlan[intensity]?.[exerciseName]?.isBW) return true;
+  if (userPlan) {
+    if (userPlan.Heavy?.[exerciseName]?.isBW) return true;
+    if (userPlan.Light?.[exerciseName]?.isBW) return true;
+    if (userPlan.Medium?.[exerciseName]?.isBW) return true;
+  }
+  return false;
+}
+
+/**
+ * Gets the total reps logged for a workout entry across completed sets.
+ */
+export function getWorkoutTotalReps(workout: Workout): number {
+  return (Number(workout.set1) || 0) + (Number(workout.set2) || 0) + (Number(workout.set3) || 0);
+}
+
+/**
+ * Gets the plot value for a workout entry.
+ * For exercises with BW as the target weight, plot reps multiplied by 10.
+ * Otherwise returns the logged weight.
+ */
+export function getWorkoutPlotValue(
+  workout: Workout, 
+  userPlan?: UserPlan
+): number {
+  const isBw = isBWTarget(workout.exerciseName, workout.intensity, userPlan, workout);
+  if (isBw) {
+    const reps = getWorkoutTotalReps(workout);
+    return reps * 10;
+  }
+  return workout.weight;
 }
 

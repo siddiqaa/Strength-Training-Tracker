@@ -238,8 +238,14 @@ export function LogManager({ workouts }: LogManagerProps) {
                         />
                       ) : (
                         <div className="flex items-center justify-center gap-0.5 sm:gap-1 text-[10px] sm:text-sm">
-                          <span className="text-white font-mono">{workout.weight}</span>
-                          <span className="text-zinc-600 text-[8px] sm:text-[10px] uppercase font-black">Lbs</span>
+                          {workout.isBW ? (
+                            <span className="text-orange-400 font-mono font-bold">BW</span>
+                          ) : (
+                            <>
+                              <span className="text-white font-mono">{workout.weight}</span>
+                              <span className="text-zinc-600 text-[8px] sm:text-[10px] uppercase font-black">Lbs</span>
+                            </>
+                          )}
                         </div>
                       )}
                     </td>

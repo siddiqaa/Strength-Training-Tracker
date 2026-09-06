@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Workout } from '../types';
-import { getOrderedExerciseNames, isGoalAchieved } from '../lib/workoutUtils';
+import { getOrderedExerciseNames, isGoalAchieved, isBWTarget, getWorkoutTotalReps } from '../lib/workoutUtils';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { TrendingUp, Maximize2, Minimize2 } from 'lucide-react';
 
@@ -47,6 +47,8 @@ const CustomProgressTooltip = ({ active, payload, label, hoveredIntensity, mouse
   const weight = selectedItem.value;
   const rpe = selectedItem.payload?.[`${intensity}_rpe`];
   const ga = selectedItem.payload?.[`${intensity}_ga`];
+  const isBW = selectedItem.payload?.[`${intensity}_isBW`];
+  const reps = selectedItem.payload?.[`${intensity}_reps`];
 
   let weightColorClass = 'text-orange-400';
   if (rpe === 'E') weightColorClass = 'text-green-500';
@@ -61,7 +63,13 @@ const CustomProgressTooltip = ({ active, payload, label, hoveredIntensity, mouse
           <span className="text-[8px] font-black bg-emerald-500/20 text-emerald-500 px-1 rounded uppercase tracking-tighter">GA</span>
         )}
       </div>
-      <div className={`text-xs font-mono font-bold ${weightColorClass}`}>{weight} lbs</div>
+      {isBW ? (
+        <div className={`text-xs font-mono font-bold ${weightColorClass}`}>
+          {weight} <span className="text-zinc-500 font-normal text-[10px]">({reps} reps × 10)</span>
+        </div>
+      ) : (
+        <div className={`text-xs font-mono font-bold ${weightColorClass}`}>{weight} lbs</div>
+      )}
     </div>
   );
 };
@@ -69,11 +77,17 @@ const CustomProgressTooltip = ({ active, payload, label, hoveredIntensity, mouse
 const SingleExerciseChart: React.FC<{
   exerciseName: string;
   workouts: Workout[];
+  userPlan?: any;
   isExpanded: boolean;
   onToggleExpand: () => void;
-}> = ({ exerciseName, workouts, isExpanded, onToggleExpand }) => {
+}> = ({ exerciseName, workouts, userPlan, isExpanded, onToggleExpand }) => {
   const [hoveredIntensity, setHoveredIntensity] = useState<string | null>(null);
   const [mouseYRatio, setMouseYRatio] = useState<number>(0.5);
+
+  const isExerciseBW = useMemo(() => {
+    return isBWTarget(exerciseName, undefined, userPlan) || 
+      workouts.some(w => w.exerciseName === exerciseName && w.isBW);
+  }, [exerciseName, userPlan, workouts]);
 
   const chartData = useMemo(() => {
     const dataByDate = new Map<string, any>();
@@ -91,14 +105,20 @@ const SingleExerciseChart: React.FC<{
           timestamp: w.date,
         });
       }
+      const isBw = isBWTarget(w.exerciseName, w.intensity, userPlan, w);
+      const totalReps = getWorkoutTotalReps(w);
+      const plotVal = isBw ? (totalReps * 10) : w.weight;
+
       const entry = dataByDate.get(dateStr);
-      entry[w.intensity] = w.weight;
+      entry[w.intensity] = plotVal;
       entry[`${w.intensity}_rpe`] = w.rpe;
       entry[`${w.intensity}_ga`] = isGoalAchieved(w);
+      entry[`${w.intensity}_isBW`] = isBw;
+      entry[`${w.intensity}_reps`] = totalReps;
     });
 
     return Array.from(dataByDate.values()).sort((a, b) => a.timestamp - b.timestamp);
-  }, [workouts, exerciseName]);
+  }, [workouts, exerciseName, userPlan]);
 
   const availableIntensities = useMemo(() => {
     const intensities = new Set<string>();
@@ -151,10 +171,17 @@ const SingleExerciseChart: React.FC<{
       isExpanded ? 'lg:col-span-2 border-orange-500/40 ring-1 ring-orange-500/20' : 'lg:col-span-1'
     }`}>
       <div className="flex items-center justify-between mb-4 gap-2">
-        <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-          {exerciseName}
-        </h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+            {exerciseName}
+          </h3>
+          {isExerciseBW && (
+            <span className="text-[10px] font-mono font-bold bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded-full">
+              BW (Reps × 10)
+            </span>
+          )}
+        </div>
 
         <button
           onClick={onToggleExpand}
@@ -329,6 +356,7 @@ export function ProgressChart({ workouts, userPlan }: { workouts: Workout[], use
               key={exerciseName} 
               exerciseName={exerciseName} 
               workouts={workouts} 
+              userPlan={userPlan}
               isExpanded={expandedExercise === exerciseName}
               onToggleExpand={() => setExpandedExercise(prev => prev === exerciseName ? null : exerciseName)}
             />

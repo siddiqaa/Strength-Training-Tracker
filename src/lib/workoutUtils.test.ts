@@ -4,8 +4,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise, parseWorkoutDate } from './workoutUtils';
-import { Workout } from '../types';
+import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise, parseWorkoutDate, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue } from './workoutUtils';
+import { Workout, UserPlan, MUSCLE_GROUPS } from '../types';
 
 describe('createExerciseOrderItems', () => {
   it('should convert string array into position objects', () => {
@@ -242,4 +242,73 @@ describe('parseWorkoutDate', () => {
     expect(isNaN(parseWorkoutDate(undefined))).toBe(false);
   });
 });
+
+describe('BW target and plot calculations', () => {
+  const planWithBW: UserPlan = {
+    userId: 'u1',
+    Heavy: {
+      'Pullups': { weight: 0, sets: 3, reps: '8', isBW: true },
+      'Bench Press': { weight: 185, sets: 3, reps: '8', isBW: false }
+    },
+    Light: {
+      'Pullups': { weight: 0, sets: 2, reps: '12', isBW: true }
+    },
+    Medium: {}
+  };
+
+  it('should detect isBWTarget from userPlan', () => {
+    expect(isBWTarget('Pullups', 'Heavy', planWithBW)).toBe(true);
+    expect(isBWTarget('Pullups', 'Light', planWithBW)).toBe(true);
+    expect(isBWTarget('Bench Press', 'Heavy', planWithBW)).toBe(false);
+    expect(isBWTarget('Squat', 'Heavy', planWithBW)).toBe(false);
+  });
+
+  it('should calculate total reps accurately', () => {
+    const w: Workout = {
+      userId: 'u1',
+      exerciseName: 'Pullups',
+      intensity: 'Heavy',
+      weight: 0,
+      set1: 10,
+      set2: 8,
+      set3: 6,
+      date: Date.now()
+    };
+    expect(getWorkoutTotalReps(w)).toBe(24);
+  });
+
+  it('should plot reps multiplied by 10 for BW exercises', () => {
+    const bwWorkout: Workout = {
+      userId: 'u1',
+      exerciseName: 'Pullups',
+      intensity: 'Heavy',
+      weight: 0,
+      set1: 8,
+      set2: 8,
+      set3: 8,
+      date: Date.now()
+    };
+    // 24 reps * 10 = 240
+    expect(getWorkoutPlotValue(bwWorkout, planWithBW)).toBe(240);
+  });
+
+  it('should plot standard weight for non-BW exercises', () => {
+    const regularWorkout: Workout = {
+      userId: 'u1',
+      exerciseName: 'Bench Press',
+      intensity: 'Heavy',
+      weight: 185,
+      set1: 8,
+      set2: 8,
+      set3: 8,
+      date: Date.now()
+    };
+    expect(getWorkoutPlotValue(regularWorkout, planWithBW)).toBe(185);
+  });
+
+  it('should include Abs in MUSCLE_GROUPS', () => {
+    expect(MUSCLE_GROUPS).toContain('Abs');
+  });
+});
+
 

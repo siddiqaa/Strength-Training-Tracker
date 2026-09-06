@@ -181,7 +181,7 @@ function TableCell({ workout, history, threshold }: { workout?: Workout, history
     <div className="flex flex-col items-center justify-center gap-0 py-1.5 px-0 sm:px-1 text-[10px] sm:text-xs font-mono whitespace-nowrap">
       <div className="flex items-center gap-1 sm:gap-1.5">
         <span className={`${weightColor} font-bold sm:font-black sm:text-sm px-1 rounded ${isStagnant ? 'bg-cyan-400 text-zinc-950' : ''}`}>
-          {workout.weight}
+          {workout.isBW ? 'BW' : workout.weight}
         </span>
         <span className="text-zinc-700 font-black">|</span>
         <span className="text-zinc-400 font-medium">

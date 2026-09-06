@@ -9,11 +9,23 @@ export interface PlannedSet {
   weight: number;
   sets: number;
   reps: string;
+  isBW?: boolean;
 }
 
 export type DayPlan = Record<string, PlannedSet>;
 
-export type MuscleGroup = 'Chest' | 'Shoulders' | 'Quads' | 'Back' | 'Biceps' | 'Triceps' | 'Hamstrings/Glutes';
+export const MUSCLE_GROUPS = [
+  'Chest',
+  'Shoulders',
+  'Quads',
+  'Back',
+  'Biceps',
+  'Triceps',
+  'Hamstrings/Glutes',
+  'Abs',
+] as const;
+
+export type MuscleGroup = typeof MUSCLE_GROUPS[number];
 export type PushPull = 'Push' | 'Pull';
 
 export interface ExerciseMetadata {
@@ -61,6 +73,7 @@ export interface Workout {
   targetReps?: string;
   targetSets?: number;
   rpe?: 'E' | 'M' | 'H';
+  isBW?: boolean;
 }
 
 export interface UserProfile {

@@ -14,7 +14,7 @@ import { IntensityChart } from './IntensityChart';
 import { LogManager } from './LogManager';
 import { RestTimerModal } from './RestTimerModal';
 import { Plus, Database, AlertCircle, FileJson, Download } from 'lucide-react';
-import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, parseWorkoutDate, isSameDay } from '../lib/workoutUtils';
+import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, parseWorkoutDate, isSameDay, isBWTarget } from '../lib/workoutUtils';
 
 interface DashboardProps {
   onRegisterExport?: (exportFn: () => void) => void;
@@ -150,21 +150,22 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
             const target = plan[exercise] || {};
             const expectedSets = target.sets || 3;
             const targetReps = parseInt(target.reps?.split('-')?.[0]) || parseInt(target.reps) || 8;
+            const isTargetBW = !!target.isBW;
             
-            let baseWeight = target.weight;
-            if (baseWeight === undefined || isNaN(baseWeight)) {
+            let baseWeight = isTargetBW ? 0 : target.weight;
+            if (!isTargetBW && (baseWeight === undefined || isNaN(baseWeight))) {
                const heavyWeight = userPlan['Heavy']?.[exercise]?.weight;
                if (heavyWeight !== undefined && !isNaN(heavyWeight)) {
                  if (int === 'Light') baseWeight = Math.round(heavyWeight * 0.6);
                  if (int === 'Medium') baseWeight = Math.round(heavyWeight * 0.75);
                }
             }
-            if (baseWeight === undefined || isNaN(baseWeight)) baseWeight = 50;
+            if (!isTargetBW && (baseWeight === undefined || isNaN(baseWeight))) baseWeight = 50;
             
             // Start 7.5 lighter 4 weeks ago, end at target weight this week.
             // Randomly force stagnation for some exercise-intensity pairs to test the UI indicator
             const isStagnantPair = (exercise.charCodeAt(0) + int.charCodeAt(0)) % 3 === 0;
-            const weightDiff = isStagnantPair ? -5 : (week - 3) * 2.5; 
+            const weightDiff = isTargetBW ? 0 : (isStagnantPair ? -5 : (week - 3) * 2.5); 
             
             const rpeOptions: ('E' | 'M' | 'H')[] = ['E', 'M', 'H'];
             const randomRpe = rpeOptions[Math.floor(Math.random() * rpeOptions.length)];
@@ -173,16 +174,17 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
             batch.set(docRef, {
               userId,
               exerciseName: exercise,
-              weight: Math.max(0, baseWeight + weightDiff),
+              weight: isTargetBW ? 0 : Math.max(0, baseWeight + weightDiff),
               set1: targetReps,
               set2: targetReps,
               ...(expectedSets >= 3 ? { set3: targetReps } : {}),
               intensity: int,
-              targetWeight: target.weight !== undefined ? target.weight : baseWeight,
+              targetWeight: isTargetBW ? 0 : (target.weight !== undefined ? target.weight : baseWeight),
               targetReps: target.reps || '8',
               targetSets: expectedSets,
               rpe: randomRpe,
               date: Timestamp.fromDate(date),
+              isBW: isTargetBW,
             });
           }
         }
@@ -422,7 +424,11 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
 }
 
 const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, userPlan: UserPlan, workouts: Workout[] }> = ({ exercise, target, intensity, userPlan, workouts }) => {
-  const [actualWt, setActualWt] = useState<string | number>(() => target?.weight !== undefined ? target.weight : '');
+  const isTargetBW = isBWTarget(exercise, intensity, userPlan) || !!target?.isBW;
+  const [actualWt, setActualWt] = useState<string | number>(() => {
+    if (isTargetBW) return 0;
+    return target?.weight !== undefined ? target.weight : '';
+  });
   const [set1, set1Reps] = useState<string | number>('');
   const [set2, set2Reps] = useState<string | number>('');
   const [set3, set3Reps] = useState<string | number>('');
@@ -460,19 +466,23 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
 
   useEffect(() => {
     if (todayWorkout) {
-      setActualWt(todayWorkout.weight !== undefined && todayWorkout.weight !== null ? todayWorkout.weight : (target?.weight ?? ''));
+      if (!isTargetBW) {
+        setActualWt(todayWorkout.weight !== undefined && todayWorkout.weight !== null ? todayWorkout.weight : (target?.weight ?? ''));
+      } else {
+        setActualWt(0);
+      }
       set1Reps(todayWorkout.set1 !== undefined && todayWorkout.set1 !== null && todayWorkout.set1 !== 0 ? todayWorkout.set1 : '');
       set2Reps(todayWorkout.set2 !== undefined && todayWorkout.set2 !== null && todayWorkout.set2 !== 0 ? todayWorkout.set2 : '');
       set3Reps(todayWorkout.set3 !== undefined && todayWorkout.set3 !== null && todayWorkout.set3 !== 0 ? todayWorkout.set3 : '');
       setRpe(todayWorkout.rpe || 'M');
     }
-  }, [todayWorkout]);
+  }, [todayWorkout, isTargetBW]);
 
   useEffect(() => {
-    if (!todayWorkout && target?.weight !== undefined && (actualWt === '' || actualWt === undefined)) {
+    if (!todayWorkout && !isTargetBW && target?.weight !== undefined && (actualWt === '' || actualWt === undefined)) {
       setActualWt(target.weight);
     }
-  }, [target?.weight, todayWorkout]);
+  }, [target?.weight, todayWorkout, isTargetBW]);
 
   const expectedSets = target.sets || 3;
 
@@ -480,7 +490,7 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
     if (!auth.currentUser) return;
     setIsLogging(true);
     try {
-      const parsedWeight = typeof actualWt === 'number' ? actualWt : (actualWt === '' ? 0 : Number(actualWt));
+      const parsedWeight = isTargetBW ? 0 : (typeof actualWt === 'number' ? actualWt : (actualWt === '' ? 0 : Number(actualWt)));
       const s1 = set1 !== '' ? Number(set1) : 0;
       const s2 = set2 !== '' ? Number(set2) : 0;
       const s3 = set3 !== '' ? Number(set3) : 0;
@@ -494,11 +504,12 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
         set2: isNaN(s2) ? 0 : s2,
         ...(expectedSets >= 3 ? { set3: isNaN(s3) ? 0 : s3 } : {}),
         intensity,
-        targetWeight: target?.weight !== undefined ? Number(target.weight) : safeWeight,
+        targetWeight: isTargetBW ? 0 : (target?.weight !== undefined ? Number(target.weight) : safeWeight),
         targetReps: target?.reps !== undefined ? String(target.reps) : '8',
         targetSets: expectedSets || 3,
         rpe: rpe || 'M',
         date: serverTimestamp(),
+        isBW: isTargetBW,
       };
 
       if (todayWorkout?.id) {
@@ -524,9 +535,10 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
          [intensity]: {
            ...(userPlan[intensity] || {}),
            [exercise]: {
-             weight: Number(actualWt),
+             weight: isTargetBW ? 0 : Number(actualWt),
              sets: expectedSets,
              reps: target.reps,
+             ...(isTargetBW ? { isBW: true } : {})
            }
          }
        };
@@ -538,12 +550,12 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
      }
   }
 
-  const isDiff = Number(actualWt) !== target.weight;
+  const isDiff = !isTargetBW && Number(actualWt) !== target.weight;
 
   let calcWeight = null;
   const heavyPlanWeight = userPlan['Heavy']?.[exercise]?.weight;
   
-  if ((intensity === 'Light' || intensity === 'Medium') && heavyPlanWeight !== undefined) {
+  if (!isTargetBW && (intensity === 'Light' || intensity === 'Medium') && heavyPlanWeight !== undefined) {
     if (intensity === 'Light') {
       calcWeight = Math.round(heavyPlanWeight * 0.6);
     } else if (intensity === 'Medium') {
@@ -587,7 +599,11 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
         </div>
         
         <div className="md:col-span-2 flex items-center justify-center font-mono text-sm bg-zinc-900/80 py-1.5 md:py-2 px-3 rounded-xl border border-zinc-800">
-          <span className="text-white" title="Plan">{target.weight}</span>
+          {isTargetBW ? (
+            <span className="text-orange-400 font-bold" title="Plan (Bodyweight)">BW</span>
+          ) : (
+            <span className="text-white" title="Plan">{target.weight}</span>
+          )}
           <span className="text-zinc-600 mx-1.5">/</span>
           <span 
             className={
@@ -598,9 +614,9 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
             } 
             title="Last"
           >
-            {lastWorkoutWeight !== null ? lastWorkoutWeight : '-'}
+            {lastWorkoutWeight !== null ? (isTargetBW || lastWorkout?.isBW ? 'BW' : lastWorkoutWeight) : '-'}
           </span>
-          {calcWeight !== null && (
+          {calcWeight !== null && !isTargetBW && (
             <>
               <span className="text-zinc-600 mx-1.5">/</span>
               <span className="text-black bg-zinc-300 px-1 rounded" title="Calculated">{calcWeight}</span>
@@ -610,7 +626,13 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
       </div>
       
       <div className="md:col-span-5 w-full flex flex-row gap-2 md:gap-1 justify-between md:justify-center items-center bg-zinc-900/40 md:bg-transparent p-3 md:p-0 rounded-xl md:rounded-none">
-        <input type="number" step="any" value={actualWt} onChange={e => setActualWt(e.target.value === '' ? '' : Number(e.target.value))} className="w-16 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Actual Weight" />
+        {isTargetBW ? (
+          <div className="w-16 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-orange-500/40 rounded-lg py-2 px-1 text-center text-orange-400 font-mono font-bold text-sm shadow-sm select-none" title="Actual Weight (Bodyweight)">
+            BW
+          </div>
+        ) : (
+          <input type="number" step="any" value={actualWt} onChange={e => setActualWt(e.target.value === '' ? '' : Number(e.target.value))} className="w-16 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Actual Weight" />
+        )}
         
         <span className="text-zinc-600 font-black px-1 hidden md:flex items-center">|</span>
         

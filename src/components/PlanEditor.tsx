@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlan, Intensity, PlannedSet } from '../types';
+import { UserPlan, Intensity, PlannedSet, MUSCLE_GROUPS } from '../types';
 import { getOrderedExerciseNames, createExerciseOrderItems } from '../lib/workoutUtils';
 import { Plus, Trash2, ArrowUp, ArrowDown, Download, MessageSquare, AlertCircle, Save, X } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -63,14 +63,14 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
     setEditedPlan(newPlan);
   };
 
-  const updateTarget = (exercise: string, intensity: Intensity, field: keyof PlannedSet, value: string | number) => {
+  const updateTarget = (exercise: string, intensity: Intensity, field: keyof PlannedSet, value: string | number | boolean) => {
     setEditedPlan(prev => ({
       ...prev,
       [intensity]: {
         ...prev[intensity],
         [exercise]: {
           ...prev[intensity][exercise],
-          [field]: field === 'reps' ? String(value) : Number(value)
+          [field]: field === 'isBW' ? Boolean(value) : (field === 'reps' ? String(value) : Number(value))
         }
       }
     }));
@@ -205,7 +205,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
     const planRows = exercises.map(ex => {
       const formatCell = (day: PlannedSet | undefined) => {
         if (!day) return '-';
-        return `${day.sets}x${day.reps} @ ${day.weight}`;
+        return `${day.sets}x${day.reps} @ ${day.isBW ? 'BW' : day.weight}`;
       };
       
       const meta = editedPlan.exerciseMetadata?.[ex];
@@ -393,13 +393,9 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                       className="bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-400 focus:outline-none focus:border-blue-500 flex-1"
                     >
                       <option value="">Muscle Group...</option>
-                      <option value="Chest">Chest</option>
-                      <option value="Shoulders">Shoulders</option>
-                      <option value="Quads">Quads</option>
-                      <option value="Back">Back</option>
-                      <option value="Biceps">Biceps</option>
-                      <option value="Triceps">Triceps</option>
-                      <option value="Hamstrings/Glutes">Hamstrings/Glutes</option>
+                      {MUSCLE_GROUPS.map((mg) => (
+                        <option key={mg} value={mg}>{mg}</option>
+                      ))}
                     </select>
                     <select
                       value={editedPlan.exerciseMetadata?.[exercise]?.pushPull || ''}
@@ -461,38 +457,58 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                       </div>
                       
                       {isActive && target && (
-                        <div className="flex justify-between items-center">
-                          <div className="flex gap-1 items-center bg-zinc-900 border border-zinc-800 rounded-lg p-1">
-                            <input 
-                              type="number" 
-                              value={target.sets} 
-                              onChange={e => updateTarget(exercise, intensity, 'sets', e.target.value)}
-                              className="w-8 bg-transparent text-center text-xs font-mono text-white focus:outline-none"
-                            />
-                            <span className="text-zinc-600 font-mono text-[10px]">x</span>
-                            <input 
-                              type="text" 
-                              value={target.reps} 
-                              onChange={e => updateTarget(exercise, intensity, 'reps', e.target.value)}
-                              className="w-8 bg-transparent text-center text-xs font-mono text-white focus:outline-none"
-                            />
-                            <span className="text-zinc-600 font-mono text-[10px]">@</span>
-                            <input 
-                              type="number" 
-                              value={target.weight} 
-                              onChange={e => updateTarget(exercise, intensity, 'weight', e.target.value)}
-                              className="w-12 bg-transparent text-center text-xs font-mono text-white focus:outline-none"
-                            />
-                          </div>
-                          <div className="flex items-center gap-1 text-[10px] bg-zinc-900 border border-zinc-800 rounded px-2 py-1">
-                            <span className="text-zinc-600">Rest:</span>
-                            <input 
-                              type="number" 
-                              value={editedPlan.dayMetadata?.[intensity]?.restPeriod ?? 90}
-                              onChange={(e) => updateDayMetadata(intensity, 'restPeriod', e.target.value)}
-                              className="w-8 bg-transparent text-white text-center focus:outline-none"
-                            />
-                            <span className="text-zinc-600">s</span>
+                        <div className="flex flex-col gap-2">
+                          <div className="flex flex-wrap justify-between items-center gap-2">
+                            <div className="flex gap-1 items-center bg-zinc-900 border border-zinc-800 rounded-lg p-1">
+                              <input 
+                                type="number" 
+                                value={target.sets} 
+                                onChange={e => updateTarget(exercise, intensity, 'sets', e.target.value)}
+                                className="w-8 bg-transparent text-center text-xs font-mono text-white focus:outline-none"
+                                title="Sets"
+                              />
+                              <span className="text-zinc-600 font-mono text-[10px]">x</span>
+                              <input 
+                                type="text" 
+                                value={target.reps} 
+                                onChange={e => updateTarget(exercise, intensity, 'reps', e.target.value)}
+                                className="w-8 bg-transparent text-center text-xs font-mono text-white focus:outline-none"
+                                title="Reps"
+                              />
+                              <span className="text-zinc-600 font-mono text-[10px]">@</span>
+                              {target.isBW ? (
+                                <span className="w-12 text-center text-xs font-mono font-bold text-orange-400">BW</span>
+                              ) : (
+                                <input 
+                                  type="number" 
+                                  value={target.weight} 
+                                  onChange={e => updateTarget(exercise, intensity, 'weight', e.target.value)}
+                                  className="w-12 bg-transparent text-center text-xs font-mono text-white focus:outline-none"
+                                  title="Weight"
+                                />
+                              )}
+                            </div>
+
+                            <label className="flex items-center gap-1 cursor-pointer text-[10px] font-bold bg-zinc-900 border border-zinc-800 rounded px-2 py-1 select-none">
+                              <input 
+                                type="checkbox" 
+                                checked={!!target.isBW} 
+                                onChange={e => updateTarget(exercise, intensity, 'isBW', e.target.checked)}
+                                className="w-3.5 h-3.5 rounded border-zinc-700 bg-zinc-800 text-orange-500 focus:ring-orange-500 focus:ring-offset-zinc-900"
+                              />
+                              <span className={target.isBW ? "text-orange-400 font-black" : "text-zinc-500"}>BW</span>
+                            </label>
+
+                            <div className="flex items-center gap-1 text-[10px] bg-zinc-900 border border-zinc-800 rounded px-2 py-1">
+                              <span className="text-zinc-600">Rest:</span>
+                              <input 
+                                type="number" 
+                                value={editedPlan.dayMetadata?.[intensity]?.restPeriod ?? 90}
+                                onChange={(e) => updateDayMetadata(intensity, 'restPeriod', e.target.value)}
+                                className="w-8 bg-transparent text-white text-center focus:outline-none"
+                              />
+                              <span className="text-zinc-600">s</span>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -549,13 +565,9 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                           className="bg-zinc-950 border border-zinc-800 rounded-lg p-1.5 text-xs text-zinc-400 focus:outline-none focus:border-blue-500 w-full"
                         >
                           <option value="">Muscle Group...</option>
-                          <option value="Chest">Chest</option>
-                          <option value="Shoulders">Shoulders</option>
-                          <option value="Quads">Quads</option>
-                          <option value="Back">Back</option>
-                          <option value="Biceps">Biceps</option>
-                          <option value="Triceps">Triceps</option>
-                          <option value="Hamstrings/Glutes">Hamstrings/Glutes</option>
+                          {MUSCLE_GROUPS.map((mg) => (
+                            <option key={mg} value={mg}>{mg}</option>
+                          ))}
                         </select>
                         <select
                           value={editedPlan.exerciseMetadata?.[exercise]?.pushPull || ''}
@@ -585,30 +597,45 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                           </label>
                           
                           {isActive && target && (
-                            <div className="flex gap-1.5 items-center bg-zinc-950 border border-zinc-800 rounded-lg p-1.5 w-max">
-                              <input 
-                                type="number" 
-                                title="Sets"
-                                value={target.sets} 
-                                onChange={e => updateTarget(exercise, intensity, 'sets', e.target.value)}
-                                className="w-10 bg-transparent border-none p-1 text-center text-sm font-mono text-white focus:outline-none focus:bg-zinc-800 rounded"
-                              />
-                              <span className="text-zinc-600 font-mono text-xs">x</span>
-                              <input 
-                                type="text" 
-                                title="Reps"
-                                value={target.reps} 
-                                onChange={e => updateTarget(exercise, intensity, 'reps', e.target.value)}
-                                className="w-10 bg-transparent border-none p-1 text-center text-sm font-mono text-white focus:outline-none focus:bg-zinc-800 rounded"
-                              />
-                              <span className="text-zinc-600 font-mono text-xs">@</span>
-                              <input 
-                                type="number" 
-                                title="Weight"
-                                value={target.weight} 
-                                onChange={e => updateTarget(exercise, intensity, 'weight', e.target.value)}
-                                className="w-14 bg-transparent border-none p-1 text-center text-sm font-mono text-white focus:outline-none focus:bg-zinc-800 rounded"
-                              />
+                            <div className="flex flex-col gap-1.5">
+                              <div className="flex gap-1.5 items-center bg-zinc-950 border border-zinc-800 rounded-lg p-1.5 w-max">
+                                <input 
+                                  type="number" 
+                                  title="Sets"
+                                  value={target.sets} 
+                                  onChange={e => updateTarget(exercise, intensity, 'sets', e.target.value)}
+                                  className="w-10 bg-transparent border-none p-1 text-center text-sm font-mono text-white focus:outline-none focus:bg-zinc-800 rounded"
+                                />
+                                <span className="text-zinc-600 font-mono text-xs">x</span>
+                                <input 
+                                  type="text" 
+                                  title="Reps"
+                                  value={target.reps} 
+                                  onChange={e => updateTarget(exercise, intensity, 'reps', e.target.value)}
+                                  className="w-10 bg-transparent border-none p-1 text-center text-sm font-mono text-white focus:outline-none focus:bg-zinc-800 rounded"
+                                />
+                                <span className="text-zinc-600 font-mono text-xs">@</span>
+                                {target.isBW ? (
+                                  <span className="w-14 text-center text-sm font-mono font-bold text-orange-400 py-1">BW</span>
+                                ) : (
+                                  <input 
+                                    type="number" 
+                                    title="Weight"
+                                    value={target.weight} 
+                                    onChange={e => updateTarget(exercise, intensity, 'weight', e.target.value)}
+                                    className="w-14 bg-transparent border-none p-1 text-center text-sm font-mono text-white focus:outline-none focus:bg-zinc-800 rounded"
+                                  />
+                                )}
+                              </div>
+                              <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-zinc-400 hover:text-zinc-200 select-none w-fit">
+                                <input 
+                                  type="checkbox" 
+                                  checked={!!target.isBW} 
+                                  onChange={e => updateTarget(exercise, intensity, 'isBW', e.target.checked)}
+                                  className="w-3.5 h-3.5 rounded border-zinc-700 bg-zinc-800 text-orange-500 focus:ring-orange-500 focus:ring-offset-zinc-900"
+                                />
+                                <span className={target.isBW ? "text-orange-400 font-black" : "text-zinc-500"}>Bodyweight (BW)</span>
+                              </label>
                             </div>
                           )}
                         </td>

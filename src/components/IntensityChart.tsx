@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Workout, Intensity } from '../types';
-import { getOrderedExerciseNames, isGoalAchieved } from '../lib/workoutUtils';
+import { getOrderedExerciseNames, isGoalAchieved, isBWTarget, getWorkoutTotalReps } from '../lib/workoutUtils';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Activity, Maximize2, Minimize2 } from 'lucide-react';
 
@@ -47,6 +47,8 @@ const CustomIntensityTooltip = ({ active, payload, hoveredExercise, mouseYRatio 
   const weight = selectedItem.value;
   const rpe = selectedItem.payload?.[`${exerciseName}_rpe`];
   const ga = selectedItem.payload?.[`${exerciseName}_ga`];
+  const isBW = selectedItem.payload?.[`${exerciseName}_isBW`];
+  const reps = selectedItem.payload?.[`${exerciseName}_reps`];
 
   let weightColorClass = 'text-orange-400';
   if (rpe === 'E') weightColorClass = 'text-green-500';
@@ -61,7 +63,13 @@ const CustomIntensityTooltip = ({ active, payload, hoveredExercise, mouseYRatio 
           <span className="text-[8px] font-black bg-emerald-500/20 text-emerald-500 px-1 rounded uppercase tracking-tighter">GA</span>
         )}
       </div>
-      <div className={`text-xs font-mono font-bold ${weightColorClass}`}>{weight} lbs</div>
+      {isBW ? (
+        <div className={`text-xs font-mono font-bold ${weightColorClass}`}>
+          {weight} <span className="text-zinc-500 font-normal text-[10px]">({reps} reps × 10)</span>
+        </div>
+      ) : (
+        <div className={`text-xs font-mono font-bold ${weightColorClass}`}>{weight} lbs</div>
+      )}
     </div>
   );
 };
@@ -94,20 +102,33 @@ const SingleIntensityChart: React.FC<{
         });
       }
       
+      const isBw = isBWTarget(w.exerciseName, w.intensity, userPlan, w);
+      const totalReps = getWorkoutTotalReps(w);
+      const plotVal = isBw ? (totalReps * 10) : w.weight;
+
       const entry = dataByDate.get(dateStr);
-      entry[w.exerciseName] = w.weight;
+      entry[w.exerciseName] = plotVal;
       entry[`${w.exerciseName}_rpe`] = w.rpe;
       entry[`${w.exerciseName}_ga`] = isGoalAchieved(w);
+      entry[`${w.exerciseName}_isBW`] = isBw;
+      entry[`${w.exerciseName}_reps`] = totalReps;
     });
 
     return Array.from(dataByDate.values()).sort((a, b) => a.timestamp - b.timestamp);
-  }, [workouts, intensity]);
+  }, [workouts, intensity, userPlan]);
 
   const availableExercises = useMemo(() => {
     const exercises = new Set<string>();
     chartData.forEach(d => {
       Object.keys(d).forEach(k => {
-        if (k !== 'date' && k !== 'timestamp' && !k.endsWith('_rpe') && !k.endsWith('_ga')) {
+        if (
+          k !== 'date' && 
+          k !== 'timestamp' && 
+          !k.endsWith('_rpe') && 
+          !k.endsWith('_ga') && 
+          !k.endsWith('_isBW') && 
+          !k.endsWith('_reps')
+        ) {
           exercises.add(k);
         }
       });
