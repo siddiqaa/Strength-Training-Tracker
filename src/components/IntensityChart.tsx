@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Workout, Intensity } from '../types';
-import { getOrderedExerciseNames, isGoalAchieved, isBWTarget, getWorkoutTotalReps } from '../lib/workoutUtils';
+import { getOrderedExerciseNames, isGoalAchieved, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue } from '../lib/workoutUtils';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Activity, Maximize2, Minimize2 } from 'lucide-react';
 
@@ -65,7 +65,7 @@ const CustomIntensityTooltip = ({ active, payload, hoveredExercise, mouseYRatio 
       </div>
       {isBW ? (
         <div className={`text-xs font-mono font-bold ${weightColorClass}`}>
-          {weight} <span className="text-zinc-500 font-normal text-[10px]">({reps} reps × 10)</span>
+          {weight} <span className="text-zinc-500 font-normal text-[10px]">reps (BW)</span>
         </div>
       ) : (
         <div className={`text-xs font-mono font-bold ${weightColorClass}`}>{weight} lbs</div>
@@ -104,7 +104,7 @@ const SingleIntensityChart: React.FC<{
       
       const isBw = isBWTarget(w.exerciseName, w.intensity, userPlan, w);
       const totalReps = getWorkoutTotalReps(w);
-      const plotVal = isBw ? (totalReps * 10) : w.weight;
+      const plotVal = getWorkoutPlotValue(w, userPlan);
 
       const entry = dataByDate.get(dateStr);
       entry[w.exerciseName] = plotVal;

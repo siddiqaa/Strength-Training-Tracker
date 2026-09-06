@@ -277,7 +277,7 @@ describe('BW target and plot calculations', () => {
     expect(getWorkoutTotalReps(w)).toBe(24);
   });
 
-  it('should plot reps multiplied by 10 for BW exercises', () => {
+  it('should plot total reps for BW exercises without multiplier', () => {
     const bwWorkout: Workout = {
       userId: 'u1',
       exerciseName: 'Pullups',
@@ -288,8 +288,8 @@ describe('BW target and plot calculations', () => {
       set3: 8,
       date: Date.now()
     };
-    // 24 reps * 10 = 240
-    expect(getWorkoutPlotValue(bwWorkout, planWithBW)).toBe(240);
+    // 24 reps total
+    expect(getWorkoutPlotValue(bwWorkout, planWithBW)).toBe(24);
   });
 
   it('should plot standard weight for non-BW exercises', () => {

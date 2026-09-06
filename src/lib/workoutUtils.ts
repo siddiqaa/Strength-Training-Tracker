@@ -223,7 +223,7 @@ export function getWorkoutTotalReps(workout: Workout): number {
 
 /**
  * Gets the plot value for a workout entry.
- * For exercises with BW as the target weight, plot reps multiplied by 10.
+ * For exercises with BW as the target weight, plot the total completed reps.
  * Otherwise returns the logged weight.
  */
 export function getWorkoutPlotValue(
@@ -232,8 +232,7 @@ export function getWorkoutPlotValue(
 ): number {
   const isBw = isBWTarget(workout.exerciseName, workout.intensity, userPlan, workout);
   if (isBw) {
-    const reps = getWorkoutTotalReps(workout);
-    return reps * 10;
+    return getWorkoutTotalReps(workout);
   }
   return workout.weight;
 }
