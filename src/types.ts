@@ -32,6 +32,7 @@ export interface ExerciseMetadata {
   muscleGroup?: MuscleGroup;
   pushPull?: PushPull;
   notes?: string;
+  additionalRest?: number;
 }
 
 export interface DayMetadata {

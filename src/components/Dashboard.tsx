@@ -436,7 +436,9 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
   const [isLogging, setIsLogging] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
 
-  const restSeconds = userPlan.dayMetadata?.[intensity]?.restPeriod ?? 90;
+  const baseRest = userPlan.dayMetadata?.[intensity]?.restPeriod ?? 90;
+  const additionalRest = userPlan.exerciseMetadata?.[exercise]?.additionalRest ?? 0;
+  const restSeconds = baseRest + additionalRest;
 
   const todayWorkout = React.useMemo(() => {
     return workouts.find(w => 

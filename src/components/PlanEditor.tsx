@@ -89,14 +89,14 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
     }));
   };
 
-  const updateMetadata = (exercise: string, field: 'muscleGroup' | 'pushPull' | 'notes', value: string) => {
+  const updateMetadata = (exercise: string, field: 'muscleGroup' | 'pushPull' | 'notes' | 'additionalRest', value: string | number | undefined) => {
     setEditedPlan(prev => ({
       ...prev,
       exerciseMetadata: {
         ...(prev.exerciseMetadata || {}),
         [exercise]: {
           ...(prev.exerciseMetadata?.[exercise] || {}),
-          [field]: value || undefined
+          [field]: value
         }
       }
     }));
@@ -407,6 +407,18 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                       <option value="Pull">Pull</option>
                     </select>
                   </div>
+                  <div className="flex gap-2 items-center text-xs text-zinc-400 mt-1">
+                    <label>+ Rest (s):</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="5"
+                      placeholder="0"
+                      value={editedPlan.exerciseMetadata?.[exercise]?.additionalRest ?? ''}
+                      onChange={(e) => updateMetadata(exercise, 'additionalRest', e.target.value ? Number(e.target.value) : undefined)}
+                      className="bg-zinc-950 border border-zinc-800 rounded-lg p-2 w-20 text-center focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
                 </div>
                 <div className="flex flex-col gap-2">
                   <div className="flex gap-1">
@@ -578,6 +590,18 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                           <option value="Push">Push</option>
                           <option value="Pull">Pull</option>
                         </select>
+                        <div className="flex items-center justify-between text-xs text-zinc-400 mt-1">
+                          <span>+ Rest (s)</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="5"
+                            placeholder="0"
+                            value={editedPlan.exerciseMetadata?.[exercise]?.additionalRest ?? ''}
+                            onChange={(e) => updateMetadata(exercise, 'additionalRest', e.target.value ? Number(e.target.value) : undefined)}
+                            className="bg-zinc-950 border border-zinc-800 rounded-lg p-1 w-14 text-center focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
                       </div>
                     </td>
                     {(['Heavy', 'Light', 'Medium'] as Intensity[]).map(intensity => {
