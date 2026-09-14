@@ -237,3 +237,256 @@ export function getWorkoutPlotValue(
   return workout.weight;
 }
 
+export interface ExerciseVolumeDetail {
+  exerciseName: string;
+  weight: number;
+  reps: number;
+  volume: number;
+  isBW?: boolean;
+}
+
+export interface SessionVolume {
+  id: string; // dateKey_intensity
+  date: number;
+  dateStr: string;
+  fullDateStr: string;
+  intensity: Intensity;
+  totalVolume: number;
+  totalReps: number;
+  exerciseCount: number;
+  exercises: ExerciseVolumeDetail[];
+  Heavy?: number;
+  Medium?: number;
+  Light?: number;
+}
+
+export interface VolumeStats {
+  totalVolume: number;
+  totalReps: number;
+  heavyVolume: number;
+  mediumVolume: number;
+  lightVolume: number;
+  heavySessions: number;
+  mediumSessions: number;
+  lightSessions: number;
+  totalSessions: number;
+  avgHeavyVolume: number;
+  avgMediumVolume: number;
+  avgLightVolume: number;
+}
+
+export interface WeeklyVolumeItem {
+  weekLabel: string;
+  weekStart: number;
+  weekEnd: number;
+  Heavy: number;
+  Medium: number;
+  Light: number;
+  totalVolume: number;
+}
+
+export interface CumulativeVolumeItem {
+  date: number;
+  dateStr: string;
+  fullDateStr: string;
+  intensity: Intensity;
+  sessionVolume: number;
+  cumulativeTotal: number;
+  cumulativeHeavy: number;
+  cumulativeMedium: number;
+  cumulativeLight: number;
+}
+
+/**
+ * Calculates volume data for the last 60 days categorized by Heavy, Light, and Medium sessions.
+ */
+export function calculate60DayVolumeData(
+  workouts: Workout[],
+  now: Date = new Date()
+) {
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+  const sixtyDaysAgoStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime() - 60 * 24 * 60 * 60 * 1000;
+
+  // Filter workouts within the last 60 days
+  const recentWorkouts = workouts.filter(w => {
+    const time = parseWorkoutDate(w.date);
+    return time >= sixtyDaysAgoStart && time <= todayEnd;
+  });
+
+  // Group by calendar day and intensity: "YYYY-MM-DD_<intensity>"
+  const sessionMap = new Map<string, SessionVolume>();
+
+  recentWorkouts.forEach(w => {
+    const time = parseWorkoutDate(w.date);
+    const d = new Date(time);
+    const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const sessionKey = `${dateKey}_${w.intensity}`;
+
+    const reps = getWorkoutTotalReps(w);
+    const weight = Number(w.weight) || 0;
+    const volume = weight * reps;
+
+    const exerciseDetail: ExerciseVolumeDetail = {
+      exerciseName: w.exerciseName,
+      weight,
+      reps,
+      volume,
+      isBW: !!w.isBW
+    };
+
+    if (!sessionMap.has(sessionKey)) {
+      const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const fullDateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+      sessionMap.set(sessionKey, {
+        id: sessionKey,
+        date: new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(),
+        dateStr,
+        fullDateStr,
+        intensity: w.intensity,
+        totalVolume: volume,
+        totalReps: reps,
+        exerciseCount: 1,
+        exercises: [exerciseDetail],
+        Heavy: w.intensity === 'Heavy' ? volume : 0,
+        Medium: w.intensity === 'Medium' ? volume : 0,
+        Light: w.intensity === 'Light' ? volume : 0,
+      });
+    } else {
+      const existing = sessionMap.get(sessionKey)!;
+      existing.totalVolume += volume;
+      existing.totalReps += reps;
+      existing.exerciseCount += 1;
+      existing.exercises.push(exerciseDetail);
+      if (w.intensity === 'Heavy') existing.Heavy = existing.totalVolume;
+      if (w.intensity === 'Medium') existing.Medium = existing.totalVolume;
+      if (w.intensity === 'Light') existing.Light = existing.totalVolume;
+    }
+  });
+
+  // Sort sessions chronologically (oldest to newest)
+  const sessions = Array.from(sessionMap.values()).sort((a, b) => a.date - b.date);
+
+  // Compute stats
+  let totalVolume = 0;
+  let totalReps = 0;
+  let heavyVolume = 0;
+  let mediumVolume = 0;
+  let lightVolume = 0;
+  let heavySessions = 0;
+  let mediumSessions = 0;
+  let lightSessions = 0;
+
+  sessions.forEach(s => {
+    totalVolume += s.totalVolume;
+    totalReps += s.totalReps;
+    if (s.intensity === 'Heavy') {
+      heavyVolume += s.totalVolume;
+      heavySessions++;
+    } else if (s.intensity === 'Medium') {
+      mediumVolume += s.totalVolume;
+      mediumSessions++;
+    } else if (s.intensity === 'Light') {
+      lightVolume += s.totalVolume;
+      lightSessions++;
+    }
+  });
+
+  const stats: VolumeStats = {
+    totalVolume,
+    totalReps,
+    heavyVolume,
+    mediumVolume,
+    lightVolume,
+    heavySessions,
+    mediumSessions,
+    lightSessions,
+    totalSessions: sessions.length,
+    avgHeavyVolume: heavySessions > 0 ? Math.round(heavyVolume / heavySessions) : 0,
+    avgMediumVolume: mediumSessions > 0 ? Math.round(mediumVolume / mediumSessions) : 0,
+    avgLightVolume: lightSessions > 0 ? Math.round(lightVolume / lightSessions) : 0,
+  };
+
+  // Cumulative progression
+  let runningTotal = 0;
+  let runningHeavy = 0;
+  let runningMedium = 0;
+  let runningLight = 0;
+
+  const cumulativeData: CumulativeVolumeItem[] = sessions.map(s => {
+    runningTotal += s.totalVolume;
+    if (s.intensity === 'Heavy') runningHeavy += s.totalVolume;
+    if (s.intensity === 'Medium') runningMedium += s.totalVolume;
+    if (s.intensity === 'Light') runningLight += s.totalVolume;
+
+    return {
+      date: s.date,
+      dateStr: s.dateStr,
+      fullDateStr: s.fullDateStr,
+      intensity: s.intensity,
+      sessionVolume: s.totalVolume,
+      cumulativeTotal: runningTotal,
+      cumulativeHeavy: runningHeavy,
+      cumulativeMedium: runningMedium,
+      cumulativeLight: runningLight,
+    };
+  });
+
+  // Weekly buckets starting on Monday spanning the 60 days
+  const sixtyDaysAgoDate = new Date(sixtyDaysAgoStart);
+  const diffToMonday = (sixtyDaysAgoDate.getDay() + 6) % 7;
+  const firstMondayDate = new Date(
+    sixtyDaysAgoDate.getFullYear(),
+    sixtyDaysAgoDate.getMonth(),
+    sixtyDaysAgoDate.getDate() - diffToMonday,
+    0, 0, 0, 0
+  );
+
+  const weeklyBuckets: WeeklyVolumeItem[] = [];
+  const currentWeekMonday = new Date(firstMondayDate);
+
+  while (currentWeekMonday.getTime() <= todayEnd) {
+    const weekStart = currentWeekMonday.getTime();
+    const sundayEnd = new Date(
+      currentWeekMonday.getFullYear(),
+      currentWeekMonday.getMonth(),
+      currentWeekMonday.getDate() + 6,
+      23, 59, 59, 999
+    );
+    const weekEnd = sundayEnd.getTime();
+    const weekLabel = currentWeekMonday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    let wHeavy = 0;
+    let wMedium = 0;
+    let wLight = 0;
+
+    sessions.forEach(s => {
+      if (s.date >= weekStart && s.date <= weekEnd) {
+        if (s.intensity === 'Heavy') wHeavy += s.totalVolume;
+        else if (s.intensity === 'Medium') wMedium += s.totalVolume;
+        else if (s.intensity === 'Light') wLight += s.totalVolume;
+      }
+    });
+
+    weeklyBuckets.push({
+      weekLabel,
+      weekStart,
+      weekEnd,
+      Heavy: wHeavy,
+      Medium: wMedium,
+      Light: wLight,
+      totalVolume: wHeavy + wMedium + wLight,
+    });
+
+    currentWeekMonday.setDate(currentWeekMonday.getDate() + 7);
+  }
+
+  return {
+    sessions,
+    stats,
+    cumulativeData,
+    weeklyBuckets,
+    sixtyDaysAgoStart,
+    todayEnd
+  };
+}
+

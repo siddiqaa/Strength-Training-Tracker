@@ -11,6 +11,7 @@ import { PlanEditor } from './PlanEditor';
 import { WorkoutHistory } from './WorkoutHistory';
 import { ProgressChart } from './ProgressChart';
 import { IntensityChart } from './IntensityChart';
+import { VolumeChart } from './VolumeChart';
 import { LogManager } from './LogManager';
 import { RestTimerModal } from './RestTimerModal';
 import { Plus, Database, AlertCircle, FileJson, Download } from 'lucide-react';
@@ -365,6 +366,7 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
           <WorkoutHistory workouts={workouts} userPlan={userPlan} />
           <IntensityChart workouts={workouts} userPlan={userPlan} />
           <ProgressChart workouts={workouts} userPlan={userPlan} />
+          <VolumeChart workouts={workouts} userPlan={userPlan} />
         </div>
       )}
       

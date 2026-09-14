@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise, parseWorkoutDate, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue } from './workoutUtils';
+import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise, parseWorkoutDate, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue, calculate60DayVolumeData } from './workoutUtils';
 import { Workout, UserPlan, MUSCLE_GROUPS } from '../types';
 
 describe('createExerciseOrderItems', () => {
@@ -310,5 +310,147 @@ describe('BW target and plot calculations', () => {
     expect(MUSCLE_GROUPS).toContain('Abs');
   });
 });
+
+describe('calculate60DayVolumeData', () => {
+  const refNow = new Date('2026-09-14T12:00:00Z');
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  it('should return empty stats and zero volume for empty workouts', () => {
+    const result = calculate60DayVolumeData([], refNow);
+    expect(result.sessions).toEqual([]);
+    expect(result.stats.totalVolume).toBe(0);
+    expect(result.stats.heavyVolume).toBe(0);
+    expect(result.stats.mediumVolume).toBe(0);
+    expect(result.stats.lightVolume).toBe(0);
+    expect(result.stats.totalSessions).toBe(0);
+  });
+
+  it('should calculate volume accurately categorized by Heavy, Medium, and Light sessions within 60 days', () => {
+    const todayTime = refNow.getTime();
+
+    const workouts: Workout[] = [
+      // 5 days ago: Heavy session with Squat and Bench
+      {
+        id: '1',
+        userId: 'u1',
+        exerciseName: 'Squat',
+        intensity: 'Heavy',
+        weight: 200,
+        set1: 8,
+        set2: 8,
+        set3: 8, // 24 reps * 200 = 4800 lbs
+        date: todayTime - (5 * dayMs),
+      },
+      {
+        id: '2',
+        userId: 'u1',
+        exerciseName: 'Bench Press',
+        intensity: 'Heavy',
+        weight: 150,
+        set1: 8,
+        set2: 8,
+        set3: 8, // 24 reps * 150 = 3600 lbs
+        date: todayTime - (5 * dayMs),
+      },
+      // Total Heavy volume on day -5 = 8400 lbs
+
+      // 3 days ago: Light session with Squat (120 lbs, 2x15 = 30 reps = 3600 lbs)
+      {
+        id: '3',
+        userId: 'u1',
+        exerciseName: 'Squat',
+        intensity: 'Light',
+        weight: 120,
+        set1: 15,
+        set2: 15,
+        date: todayTime - (3 * dayMs),
+      },
+      // Total Light volume on day -3 = 3600 lbs
+
+      // 1 day ago: Medium session with Squat (150 lbs, 3x10 = 30 reps = 4500 lbs)
+      {
+        id: '4',
+        userId: 'u1',
+        exerciseName: 'Squat',
+        intensity: 'Medium',
+        weight: 150,
+        set1: 10,
+        set2: 10,
+        set3: 10,
+        date: todayTime - (1 * dayMs),
+      },
+      // Total Medium volume on day -1 = 4500 lbs
+
+      // 70 days ago: Outside 60-day window!
+      {
+        id: '5',
+        userId: 'u1',
+        exerciseName: 'Deadlift',
+        intensity: 'Heavy',
+        weight: 300,
+        set1: 5,
+        set2: 5,
+        date: todayTime - (70 * dayMs),
+      }
+    ];
+
+    const result = calculate60DayVolumeData(workouts, refNow);
+
+    // Only 3 sessions within 60 days
+    expect(result.sessions.length).toBe(3);
+    expect(result.stats.totalSessions).toBe(3);
+
+    // Heavy session check
+    expect(result.stats.heavySessions).toBe(1);
+    expect(result.stats.heavyVolume).toBe(8400);
+    expect(result.stats.avgHeavyVolume).toBe(8400);
+
+    // Light session check
+    expect(result.stats.lightSessions).toBe(1);
+    expect(result.stats.lightVolume).toBe(3600);
+    expect(result.stats.avgLightVolume).toBe(3600);
+
+    // Medium session check
+    expect(result.stats.mediumSessions).toBe(1);
+    expect(result.stats.mediumVolume).toBe(4500);
+    expect(result.stats.avgMediumVolume).toBe(4500);
+
+    // Total volume: 8400 + 3600 + 4500 = 16500 lbs
+    expect(result.stats.totalVolume).toBe(16500);
+
+    // Check chronological order (oldest to newest): day -5 (Heavy), day -3 (Light), day -1 (Medium)
+    expect(result.sessions[0].intensity).toBe('Heavy');
+    expect(result.sessions[0].totalVolume).toBe(8400);
+    expect(result.sessions[0].exerciseCount).toBe(2);
+
+    expect(result.sessions[1].intensity).toBe('Light');
+    expect(result.sessions[1].totalVolume).toBe(3600);
+
+    expect(result.sessions[2].intensity).toBe('Medium');
+    expect(result.sessions[2].totalVolume).toBe(4500);
+
+    // Cumulative progression
+    expect(result.cumulativeData.length).toBe(3);
+    expect(result.cumulativeData[0].cumulativeTotal).toBe(8400);
+    expect(result.cumulativeData[1].cumulativeTotal).toBe(12000);
+    expect(result.cumulativeData[2].cumulativeTotal).toBe(16500);
+
+    // Verify weekly buckets start on Monday
+    expect(result.weeklyBuckets.length).toBeGreaterThan(0);
+    result.weeklyBuckets.forEach(bucket => {
+      const startDate = new Date(bucket.weekStart);
+      const endDate = new Date(bucket.weekEnd);
+      // Monday in JavaScript getDay() is 1
+      expect(startDate.getDay()).toBe(1);
+      // Sunday in JavaScript getDay() is 0
+      expect(endDate.getDay()).toBe(0);
+    });
+
+    // Sum of all weekly buckets should match total volume of all sessions
+    const weeklySum = result.weeklyBuckets.reduce((acc, b) => acc + b.totalVolume, 0);
+    expect(weeklySum).toBe(16500);
+  });
+});
+
 
 
