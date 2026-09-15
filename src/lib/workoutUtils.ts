@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Workout, ExerciseOrderItem, Intensity, UserPlan } from '../types';
+import { Workout, ExerciseOrderItem, Intensity, UserPlan, ExerciseEquipment } from '../types';
 
 export { type ExerciseOrderItem };
 
@@ -237,9 +237,38 @@ export function getWorkoutPlotValue(
   return workout.weight;
 }
 
+/**
+ * Calculates the effective total weight lifted based on exercise equipment:
+ * - '2 dumbbell': double the weight entered (W * 2)
+ * - 'barbell': double the weight entered (plate weight) plus 45 lb barbell (W * 2 + 45)
+ * - 'cable' | '1 dumbbell' | undefined: weight entered as is (W)
+ */
+export function calculateEffectiveWeight(
+  enteredWeight: number | undefined,
+  equipment?: ExerciseEquipment | string,
+  isBW?: boolean
+): number {
+  const w = Number(enteredWeight) || 0;
+  if (isBW && w === 0 && !equipment) {
+    return 0;
+  }
+  switch (equipment) {
+    case '2 dumbbell':
+      return w * 2;
+    case 'barbell':
+      return (w * 2) + 45;
+    case 'cable':
+    case '1 dumbbell':
+    default:
+      return w;
+  }
+}
+
 export interface ExerciseVolumeDetail {
   exerciseName: string;
   weight: number;
+  effectiveWeight?: number;
+  equipment?: ExerciseEquipment;
   reps: number;
   volume: number;
   isBW?: boolean;
@@ -302,7 +331,8 @@ export interface CumulativeVolumeItem {
  */
 export function calculate60DayVolumeData(
   workouts: Workout[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  userPlan?: UserPlan | null
 ) {
   const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
   const sixtyDaysAgoStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime() - 60 * 24 * 60 * 60 * 1000;
@@ -324,14 +354,19 @@ export function calculate60DayVolumeData(
 
     const reps = getWorkoutTotalReps(w);
     const weight = Number(w.weight) || 0;
-    const volume = weight * reps;
+    const isBW = isBWTarget(w.exerciseName, w.intensity, userPlan, w) || !!w.isBW;
+    const equipment = userPlan?.exerciseMetadata?.[w.exerciseName]?.equipment;
+    const effectiveWeight = calculateEffectiveWeight(weight, equipment, isBW);
+    const volume = effectiveWeight * reps;
 
     const exerciseDetail: ExerciseVolumeDetail = {
       exerciseName: w.exerciseName,
       weight,
+      effectiveWeight,
+      equipment,
       reps,
       volume,
-      isBW: !!w.isBW
+      isBW
     };
 
     if (!sessionMap.has(sessionKey)) {

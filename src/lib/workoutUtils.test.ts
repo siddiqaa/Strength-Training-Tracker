@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise, parseWorkoutDate, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue, calculate60DayVolumeData, getYouTubeEmbedUrl, normalizeVideoUrl } from './workoutUtils';
+import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise, parseWorkoutDate, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue, calculate60DayVolumeData, calculateEffectiveWeight, getYouTubeEmbedUrl, normalizeVideoUrl } from './workoutUtils';
 import { Workout, UserPlan, MUSCLE_GROUPS } from '../types';
 
 describe('createExerciseOrderItems', () => {
@@ -510,6 +510,117 @@ describe('getYouTubeEmbedUrl', () => {
       .toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=90');
     expect(getYouTubeEmbedUrl('https://youtu.be/dQw4w9WgXcQ?start=65'))
       .toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=65');
+  });
+});
+
+describe('calculateEffectiveWeight', () => {
+  it('should double the weight entered for 2 dumbbell equipment', () => {
+    expect(calculateEffectiveWeight(25, '2 dumbbell')).toBe(50);
+    expect(calculateEffectiveWeight(37.5, '2 dumbbell')).toBe(75);
+    expect(calculateEffectiveWeight(0, '2 dumbbell')).toBe(0);
+  });
+
+  it('should calculate double the weight entered plus 45 lb bar for barbell equipment', () => {
+    // 45 lb plate weight entered (one 45 on each side + 45 bar = 135 total)
+    expect(calculateEffectiveWeight(45, 'barbell')).toBe(135);
+    // 100 lb plate weight entered (two 45s + 10 = 100 on each side + 45 bar = 245 total)
+    expect(calculateEffectiveWeight(100, 'barbell')).toBe(245);
+    // 0 plate weight entered (empty 45 bar)
+    expect(calculateEffectiveWeight(0, 'barbell')).toBe(45);
+  });
+
+  it('should return weight entered as is for cable and 1 dumbbell', () => {
+    expect(calculateEffectiveWeight(60, 'cable')).toBe(60);
+    expect(calculateEffectiveWeight(50, '1 dumbbell')).toBe(50);
+  });
+
+  it('should return weight entered as is when equipment is undefined or unspecified', () => {
+    expect(calculateEffectiveWeight(135, undefined)).toBe(135);
+    expect(calculateEffectiveWeight(100)).toBe(100);
+  });
+
+  it('should return 0 for bodyweight exercise with 0 weight and no equipment', () => {
+    expect(calculateEffectiveWeight(0, undefined, true)).toBe(0);
+  });
+});
+
+describe('calculate60DayVolumeData with equipment', () => {
+  const refNow = new Date('2026-09-14T12:00:00Z');
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  it('should properly apply equipment multipliers to volume calculations', () => {
+    const userPlan: UserPlan = {
+      userId: 'u1',
+      Heavy: {},
+      Light: {},
+      Medium: {},
+      exerciseMetadata: {
+        'Dumbbell Press': { equipment: '2 dumbbell' },
+        'Barbell Bench Press': { equipment: 'barbell' },
+        'Cable Triceps Pushdown': { equipment: 'cable' },
+        'One-Arm Dumbbell Row': { equipment: '1 dumbbell' },
+      }
+    };
+
+    const workouts: Workout[] = [
+      {
+        id: '1',
+        userId: 'u1',
+        exerciseName: 'Dumbbell Press',
+        intensity: 'Heavy',
+        weight: 30, // 30 * 2 = 60 effective wt
+        set1: 10,
+        set2: 10,
+        set3: 10, // 30 reps * 60 = 1800 lbs
+        date: refNow.getTime() - (2 * dayMs),
+      },
+      {
+        id: '2',
+        userId: 'u1',
+        exerciseName: 'Barbell Bench Press',
+        intensity: 'Heavy',
+        weight: 45, // (45 * 2) + 45 = 135 effective wt
+        set1: 8,
+        set2: 8,
+        set3: 8, // 24 reps * 135 = 3240 lbs
+        date: refNow.getTime() - (2 * dayMs),
+      },
+      {
+        id: '3',
+        userId: 'u1',
+        exerciseName: 'Cable Triceps Pushdown',
+        intensity: 'Heavy',
+        weight: 50, // 50 effective wt
+        set1: 10,
+        set2: 10, // 20 reps * 50 = 1000 lbs
+        date: refNow.getTime() - (2 * dayMs),
+      },
+      {
+        id: '4',
+        userId: 'u1',
+        exerciseName: 'One-Arm Dumbbell Row',
+        intensity: 'Heavy',
+        weight: 40, // 40 effective wt
+        set1: 10,
+        set2: 10, // 20 reps * 40 = 800 lbs
+        date: refNow.getTime() - (2 * dayMs),
+      }
+    ];
+
+    const result = calculate60DayVolumeData(workouts, refNow, userPlan);
+
+    // Total expected volume: 1800 + 3240 + 1000 + 800 = 6840 lbs
+    expect(result.sessions.length).toBe(1);
+    expect(result.sessions[0].totalVolume).toBe(6840);
+    expect(result.stats.totalVolume).toBe(6840);
+
+    const dbPress = result.sessions[0].exercises.find(e => e.exerciseName === 'Dumbbell Press');
+    expect(dbPress?.effectiveWeight).toBe(60);
+    expect(dbPress?.volume).toBe(1800);
+
+    const bbBench = result.sessions[0].exercises.find(e => e.exerciseName === 'Barbell Bench Press');
+    expect(bbBench?.effectiveWeight).toBe(135);
+    expect(bbBench?.volume).toBe(3240);
   });
 });
 

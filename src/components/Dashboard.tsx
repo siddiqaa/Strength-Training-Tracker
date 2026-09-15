@@ -441,6 +441,7 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
   const [showVideoModal, setShowVideoModal] = useState(false);
 
   const videoUrl = userPlan.exerciseMetadata?.[exercise]?.videoUrl?.trim();
+  const equipment = userPlan.exerciseMetadata?.[exercise]?.equipment;
 
   const baseRest = userPlan.dayMetadata?.[intensity]?.restPeriod ?? 90;
   const additionalRest = userPlan.exerciseMetadata?.[exercise]?.additionalRest ?? 0;
@@ -598,6 +599,11 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
                 <Video className="w-3.5 h-3.5" />
               </button>
             )}
+            {equipment && (
+              <span className="text-[9px] font-mono text-zinc-400 bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 rounded capitalize flex-shrink-0" title={`Equipment: ${equipment}`}>
+                {equipment}
+              </span>
+            )}
           </div>
           {todayWorkout && (
             <div className="mt-1">
@@ -617,29 +623,36 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
           )}
         </div>
         
-        <div className="md:col-span-2 flex items-center justify-center font-mono text-sm bg-zinc-900/80 py-1.5 md:py-2 px-3 rounded-xl border border-zinc-800">
-          {isTargetBW ? (
-            <span className="text-orange-400 font-bold" title="Plan (Bodyweight)">BW</span>
-          ) : (
-            <span className="text-white" title="Plan">{target.weight}</span>
-          )}
-          <span className="text-zinc-600 mx-1.5">/</span>
-          <span 
-            className={
-              lastWorkoutRpe === 'E' ? 'text-green-500 font-bold' :
-              lastWorkoutRpe === 'M' ? 'text-yellow-500 font-bold' :
-              lastWorkoutRpe === 'H' ? 'text-red-500 font-bold' :
-              'text-zinc-400'
-            } 
-            title="Last"
-          >
-            {lastWorkoutWeight !== null ? (isTargetBW || lastWorkout?.isBW ? 'BW' : lastWorkoutWeight) : '-'}
-          </span>
-          {calcWeight !== null && !isTargetBW && (
-            <>
-              <span className="text-zinc-600 mx-1.5">/</span>
-              <span className="text-black bg-zinc-300 px-1 rounded" title="Calculated">{calcWeight}</span>
-            </>
+        <div className="md:col-span-2 flex flex-col items-center justify-center font-mono text-sm bg-zinc-900/80 py-1.5 md:py-2 px-3 rounded-xl border border-zinc-800">
+          <div className="flex items-center justify-center">
+            {isTargetBW ? (
+              <span className="text-orange-400 font-bold" title="Plan (Bodyweight)">BW</span>
+            ) : (
+              <span className="text-white" title="Plan">{target.weight}</span>
+            )}
+            <span className="text-zinc-600 mx-1.5">/</span>
+            <span 
+              className={
+                lastWorkoutRpe === 'E' ? 'text-green-500 font-bold' :
+                lastWorkoutRpe === 'M' ? 'text-yellow-500 font-bold' :
+                lastWorkoutRpe === 'H' ? 'text-red-500 font-bold' :
+                'text-zinc-400'
+              } 
+              title="Last"
+            >
+              {lastWorkoutWeight !== null ? (isTargetBW || lastWorkout?.isBW ? 'BW' : lastWorkoutWeight) : '-'}
+            </span>
+            {calcWeight !== null && !isTargetBW && (
+              <>
+                <span className="text-zinc-600 mx-1.5">/</span>
+                <span className="text-black bg-zinc-300 px-1 rounded" title="Calculated">{calcWeight}</span>
+              </>
+            )}
+          </div>
+          {!isTargetBW && equipment && (equipment === 'barbell' || equipment === '2 dumbbell') && (
+            <span className="text-[9px] text-zinc-500 font-mono mt-0.5" title={equipment === 'barbell' ? 'Effective: Plate wt x 2 + 45 lb bar' : 'Effective: Dumbbell wt x 2'}>
+              {equipment === 'barbell' ? `eff: ${(Number(target.weight || 0) * 2) + 45} lb` : `eff: ${Number(target.weight || 0) * 2} lb`}
+            </span>
           )}
         </div>
       </div>

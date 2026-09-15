@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Workout, Intensity } from '../types';
+import { Workout, Intensity, UserPlan } from '../types';
 import { calculate60DayVolumeData, SessionVolume } from '../lib/workoutUtils';
 import {
   BarChart,
@@ -85,11 +85,18 @@ const CustomSessionTooltip = ({ active, payload }: any) => {
           <div className="text-[9px] uppercase tracking-wider font-bold text-zinc-400 mb-1">Breakdown</div>
           {session.exercises.map((ex, idx) => (
             <div key={`${ex.exerciseName}-${idx}`} className="flex items-center justify-between text-[10px] py-0.5">
-              <span className="text-zinc-300 font-medium truncate max-w-[120px]" title={ex.exerciseName}>
-                {ex.exerciseName}
-              </span>
+              <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                <span className="text-zinc-300 font-medium truncate max-w-[110px]" title={ex.exerciseName}>
+                  {ex.exerciseName}
+                </span>
+                {ex.equipment && (
+                  <span className="text-[8px] text-zinc-500 font-mono px-1 py-0.5 bg-zinc-900 border border-zinc-800 rounded flex-shrink-0" title={`Equipment: ${ex.equipment}`}>
+                    {ex.equipment}
+                  </span>
+                )}
+              </div>
               <span className="font-mono text-zinc-400 whitespace-nowrap">
-                {ex.isBW && ex.weight === 0 ? (
+                {ex.isBW && ex.volume === 0 ? (
                   <span className="text-zinc-500">{ex.reps} reps (BW)</span>
                 ) : (
                   <span>
@@ -193,14 +200,14 @@ const CustomCumulativeTooltip = ({ active, payload }: any) => {
   );
 };
 
-export function VolumeChart({ workouts }: { workouts: Workout[]; userPlan?: any }) {
+export function VolumeChart({ workouts, userPlan }: { workouts: Workout[]; userPlan?: UserPlan | null }) {
   const [viewMode, setViewMode] = useState<'session' | 'weekly' | 'cumulative'>('session');
   const [selectedIntensity, setSelectedIntensity] = useState<'All' | Intensity>('All');
   const [isExpanded, setIsExpanded] = useState(false);
 
   const { sessions, stats, cumulativeData, weeklyBuckets } = useMemo(() => {
-    return calculate60DayVolumeData(workouts);
-  }, [workouts]);
+    return calculate60DayVolumeData(workouts, new Date(), userPlan);
+  }, [workouts, userPlan]);
 
   const filteredSessions = useMemo(() => {
     if (selectedIntensity === 'All') return sessions;

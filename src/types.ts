@@ -28,12 +28,22 @@ export const MUSCLE_GROUPS = [
 export type MuscleGroup = typeof MUSCLE_GROUPS[number];
 export type PushPull = 'Push' | 'Pull';
 
+export const EXERCISE_EQUIPMENT_OPTIONS = [
+  '2 dumbbell',
+  'barbell',
+  'cable',
+  '1 dumbbell',
+] as const;
+
+export type ExerciseEquipment = typeof EXERCISE_EQUIPMENT_OPTIONS[number];
+
 export interface ExerciseMetadata {
   muscleGroup?: MuscleGroup;
   pushPull?: PushPull;
   notes?: string;
   additionalRest?: number;
   videoUrl?: string;
+  equipment?: ExerciseEquipment;
 }
 
 export interface DayMetadata {

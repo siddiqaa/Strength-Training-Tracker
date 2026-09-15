@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlan, Intensity, PlannedSet, MUSCLE_GROUPS } from '../types';
-import { getOrderedExerciseNames, createExerciseOrderItems, normalizeVideoUrl } from '../lib/workoutUtils';
+import { UserPlan, Intensity, PlannedSet, MUSCLE_GROUPS, ExerciseEquipment, EXERCISE_EQUIPMENT_OPTIONS } from '../types';
+import { getOrderedExerciseNames, createExerciseOrderItems, normalizeVideoUrl, calculateEffectiveWeight } from '../lib/workoutUtils';
 import { Plus, Trash2, ArrowUp, ArrowDown, Download, MessageSquare, AlertCircle, Save, X, Video, ExternalLink } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -89,7 +89,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
     }));
   };
 
-  const updateMetadata = (exercise: string, field: 'muscleGroup' | 'pushPull' | 'notes' | 'additionalRest' | 'videoUrl', value: string | number | undefined) => {
+  const updateMetadata = (exercise: string, field: 'muscleGroup' | 'pushPull' | 'notes' | 'additionalRest' | 'videoUrl' | 'equipment', value: string | number | undefined) => {
     setEditedPlan(prev => ({
       ...prev,
       exerciseMetadata: {
@@ -239,10 +239,12 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
     });
 
     // Volume totals
-    const getVol = (set: PlannedSet | undefined) => {
+    const getVol = (set: PlannedSet | undefined, exercise: string) => {
       if (!set) return 0;
       const reps = parseInt(set.reps) || 0;
-      return set.sets * reps * set.weight;
+      const equipment = editedPlan.exerciseMetadata?.[exercise]?.equipment;
+      const effWeight = calculateEffectiveWeight(set.weight, equipment, set.isBW);
+      return set.sets * reps * effWeight;
     };
 
     const volumeData = Object.keys(editedPlan.exerciseMetadata || {}).reduce((acc, exercise) => {
@@ -266,9 +268,9 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
         acc[key].light += editedPlan.Light[exercise]?.sets || 0;
         acc[key].medium += editedPlan.Medium[exercise]?.sets || 0;
 
-        acc[key].heavyVol += getVol(editedPlan.Heavy[exercise]);
-        acc[key].lightVol += getVol(editedPlan.Light[exercise]);
-        acc[key].mediumVol += getVol(editedPlan.Medium[exercise]);
+        acc[key].heavyVol += getVol(editedPlan.Heavy[exercise], exercise);
+        acc[key].lightVol += getVol(editedPlan.Light[exercise], exercise);
+        acc[key].mediumVol += getVol(editedPlan.Medium[exercise], exercise);
       }
       return acc;
     }, {} as Record<string, { pushPull: string, muscleGroup: string, heavy: number, light: number, medium: number, heavyVol: number, lightVol: number, mediumVol: number }>);
@@ -405,6 +407,18 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                       <option value="">Push/Pull...</option>
                       <option value="Push">Push</option>
                       <option value="Pull">Pull</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-2">
+                    <select
+                      value={editedPlan.exerciseMetadata?.[exercise]?.equipment || ''}
+                      onChange={(e) => updateMetadata(exercise, 'equipment', (e.target.value as ExerciseEquipment) || undefined)}
+                      className="bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-400 focus:outline-none focus:border-blue-500 flex-1"
+                    >
+                      <option value="">Equipment...</option>
+                      {EXERCISE_EQUIPMENT_OPTIONS.map((eq) => (
+                        <option key={eq} value={eq}>{eq}</option>
+                      ))}
                     </select>
                   </div>
                   <div className="flex gap-2 items-center text-xs text-zinc-400 mt-1">
@@ -611,6 +625,16 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                           <option value="Push">Push</option>
                           <option value="Pull">Pull</option>
                         </select>
+                        <select
+                          value={editedPlan.exerciseMetadata?.[exercise]?.equipment || ''}
+                          onChange={(e) => updateMetadata(exercise, 'equipment', (e.target.value as ExerciseEquipment) || undefined)}
+                          className="bg-zinc-950 border border-zinc-800 rounded-lg p-1.5 text-xs text-zinc-400 focus:outline-none focus:border-blue-500 w-full"
+                        >
+                          <option value="">Equipment...</option>
+                          {EXERCISE_EQUIPMENT_OPTIONS.map((eq) => (
+                            <option key={eq} value={eq}>{eq}</option>
+                          ))}
+                        </select>
                         <div className="flex items-center justify-between text-xs text-zinc-400 mt-1">
                           <span>+ Rest (s)</span>
                           <input
@@ -795,10 +819,12 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
             </thead>
           <tbody>
             {(() => {
-              const getVol = (set: PlannedSet | undefined) => {
+              const getVol = (set: PlannedSet | undefined, exercise: string) => {
                 if (!set) return 0;
                 const reps = parseInt(set.reps) || 0;
-                return set.sets * reps * set.weight;
+                const equipment = editedPlan.exerciseMetadata?.[exercise]?.equipment;
+                const effWeight = calculateEffectiveWeight(set.weight, equipment, set.isBW);
+                return set.sets * reps * effWeight;
               };
 
               const volumeData = Object.keys(editedPlan.exerciseMetadata || {}).reduce((acc, exercise) => {
@@ -822,9 +848,9 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                   acc[key].light += editedPlan.Light[exercise]?.sets || 0;
                   acc[key].medium += editedPlan.Medium[exercise]?.sets || 0;
 
-                  acc[key].heavyVol += getVol(editedPlan.Heavy[exercise]);
-                  acc[key].lightVol += getVol(editedPlan.Light[exercise]);
-                  acc[key].mediumVol += getVol(editedPlan.Medium[exercise]);
+                  acc[key].heavyVol += getVol(editedPlan.Heavy[exercise], exercise);
+                  acc[key].lightVol += getVol(editedPlan.Light[exercise], exercise);
+                  acc[key].mediumVol += getVol(editedPlan.Medium[exercise], exercise);
                 }
                 return acc;
               }, {} as Record<string, { pushPull: string, muscleGroup: string, heavy: number, light: number, medium: number, heavyVol: number, lightVol: number, mediumVol: number }>);
