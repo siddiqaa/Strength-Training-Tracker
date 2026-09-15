@@ -33,6 +33,7 @@ export interface ExerciseMetadata {
   pushPull?: PushPull;
   notes?: string;
   additionalRest?: number;
+  videoUrl?: string;
 }
 
 export interface DayMetadata {

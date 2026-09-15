@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlan, Intensity, PlannedSet, MUSCLE_GROUPS } from '../types';
-import { getOrderedExerciseNames, createExerciseOrderItems } from '../lib/workoutUtils';
-import { Plus, Trash2, ArrowUp, ArrowDown, Download, MessageSquare, AlertCircle, Save, X } from 'lucide-react';
+import { getOrderedExerciseNames, createExerciseOrderItems, normalizeVideoUrl } from '../lib/workoutUtils';
+import { Plus, Trash2, ArrowUp, ArrowDown, Download, MessageSquare, AlertCircle, Save, X, Video, ExternalLink } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -89,7 +89,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
     }));
   };
 
-  const updateMetadata = (exercise: string, field: 'muscleGroup' | 'pushPull' | 'notes' | 'additionalRest', value: string | number | undefined) => {
+  const updateMetadata = (exercise: string, field: 'muscleGroup' | 'pushPull' | 'notes' | 'additionalRest' | 'videoUrl', value: string | number | undefined) => {
     setEditedPlan(prev => ({
       ...prev,
       exerciseMetadata: {
@@ -528,6 +528,27 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                   );
                 })}
               </div>
+              <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2">
+                <Video className="w-4 h-4 text-red-500 flex-shrink-0" />
+                <input
+                  type="url"
+                  value={editedPlan.exerciseMetadata?.[exercise]?.videoUrl || ''}
+                  onChange={(e) => updateMetadata(exercise, 'videoUrl', e.target.value)}
+                  placeholder="YouTube Video Link (e.g. https://youtu.be/...)"
+                  className="bg-transparent text-xs text-zinc-300 placeholder:text-zinc-600 focus:outline-none w-full"
+                />
+                {editedPlan.exerciseMetadata?.[exercise]?.videoUrl && (
+                  <a
+                    href={normalizeVideoUrl(editedPlan.exerciseMetadata[exercise].videoUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-zinc-500 hover:text-red-400 p-1 transition-colors flex-shrink-0"
+                    title="Preview video link in new tab"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
+              </div>
               <textarea
                 value={editedPlan.exerciseMetadata?.[exercise]?.notes || ''}
                 onChange={(e) => updateMetadata(exercise, 'notes', e.target.value)}
@@ -695,16 +716,40 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                   </tr>
                   <tr className="border-b border-zinc-800/50 bg-zinc-900/5 hover:bg-zinc-900/20 transition-colors">
                     <td colSpan={5} className="p-4 pt-0">
-                      <div className="flex gap-3 items-start">
-                        <div className="mt-2 text-zinc-600">
-                          <MessageSquare className="w-3 h-3" />
+                      <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center justify-between">
+                        <div className="flex gap-2 items-center flex-1 w-full">
+                          <div className="text-zinc-600 flex-shrink-0">
+                            <MessageSquare className="w-3.5 h-3.5" />
+                          </div>
+                          <textarea
+                            value={editedPlan.exerciseMetadata?.[exercise]?.notes || ''}
+                            onChange={(e) => updateMetadata(exercise, 'notes', e.target.value)}
+                            placeholder="Add cues, machine settings, or performance notes for this exercise..."
+                            className="bg-transparent border-none p-0 text-xs text-zinc-400 placeholder:text-zinc-700 focus:outline-none focus:ring-0 w-full min-h-[36px] resize-none"
+                            rows={1}
+                          />
                         </div>
-                        <textarea
-                          value={editedPlan.exerciseMetadata?.[exercise]?.notes || ''}
-                          onChange={(e) => updateMetadata(exercise, 'notes', e.target.value)}
-                          placeholder="Add cues, machine settings, or performance notes for this exercise..."
-                          className="bg-transparent border-none p-0 text-xs text-zinc-400 placeholder:text-zinc-700 focus:outline-none focus:ring-0 w-full min-h-[40px] resize-none"
-                        />
+                        <div className="flex items-center gap-2 bg-zinc-950/80 border border-zinc-800 rounded-lg px-2.5 py-1.5 w-full lg:w-96 flex-shrink-0">
+                          <Video className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+                          <input
+                            type="url"
+                            value={editedPlan.exerciseMetadata?.[exercise]?.videoUrl || ''}
+                            onChange={(e) => updateMetadata(exercise, 'videoUrl', e.target.value)}
+                            placeholder="YouTube link (e.g. https://youtu.be/...)"
+                            className="bg-transparent text-xs text-zinc-300 placeholder:text-zinc-600 focus:outline-none w-full"
+                          />
+                          {editedPlan.exerciseMetadata?.[exercise]?.videoUrl && (
+                            <a
+                              href={normalizeVideoUrl(editedPlan.exerciseMetadata[exercise].videoUrl)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-zinc-500 hover:text-red-400 transition-colors p-0.5 flex-shrink-0"
+                              title="Preview YouTube video in new tab"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>

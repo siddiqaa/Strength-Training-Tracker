@@ -490,3 +490,57 @@ export function calculate60DayVolumeData(
   };
 }
 
+/**
+ * Normalizes a video URL to guarantee a valid web protocol.
+ */
+export function normalizeVideoUrl(url?: string): string {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  return `https://${trimmed}`;
+}
+
+/**
+ * Parses a YouTube video URL (standard watch, short links, shorts, embed) and returns
+ * a privacy-enhanced embed URL for iframes, preserving timestamp offsets.
+ * Returns null if the URL is not a recognizable YouTube video link.
+ */
+export function getYouTubeEmbedUrl(url?: string): string | null {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  // Regex matching standard watch, shortened youtu.be, shorts, and embeds
+  const regExp = /(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/i;
+  const match = trimmed.match(regExp);
+
+  if (match && match[1]) {
+    const videoId = match[1];
+    let startParam = '';
+    const timeMatch = trimmed.match(/[?&](?:t|start)=([0-9hms]+)/i);
+    if (timeMatch && timeMatch[1]) {
+      const timeStr = timeMatch[1].toLowerCase();
+      let seconds = 0;
+      if (timeStr.includes('h') || timeStr.includes('m') || timeStr.includes('s')) {
+        const h = timeStr.match(/(\d+)h/);
+        const m = timeStr.match(/(\d+)m/);
+        const s = timeStr.match(/(\d+)s/);
+        if (h) seconds += parseInt(h[1], 10) * 3600;
+        if (m) seconds += parseInt(m[1], 10) * 60;
+        if (s) seconds += parseInt(s[1], 10);
+      } else {
+        seconds = parseInt(timeStr, 10) || 0;
+      }
+      if (seconds > 0) {
+        startParam = `?start=${seconds}`;
+      }
+    }
+    return `https://www.youtube-nocookie.com/embed/${videoId}${startParam}`;
+  }
+
+  return null;
+}
+

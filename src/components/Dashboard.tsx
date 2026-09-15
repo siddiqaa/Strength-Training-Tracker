@@ -14,7 +14,8 @@ import { IntensityChart } from './IntensityChart';
 import { VolumeChart } from './VolumeChart';
 import { LogManager } from './LogManager';
 import { RestTimerModal } from './RestTimerModal';
-import { Plus, Database, AlertCircle, FileJson, Download } from 'lucide-react';
+import { FormVideoModal } from './FormVideoModal';
+import { Plus, Database, AlertCircle, FileJson, Download, Video } from 'lucide-react';
 import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, parseWorkoutDate, isSameDay, isBWTarget } from '../lib/workoutUtils';
 
 interface DashboardProps {
@@ -437,6 +438,9 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
   const [rpe, setRpe] = useState<'E' | 'M' | 'H'>('M');
   const [isLogging, setIsLogging] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
+  const [showVideoModal, setShowVideoModal] = useState(false);
+
+  const videoUrl = userPlan.exerciseMetadata?.[exercise]?.videoUrl?.trim();
 
   const baseRest = userPlan.dayMetadata?.[intensity]?.restPeriod ?? 90;
   const additionalRest = userPlan.exerciseMetadata?.[exercise]?.additionalRest ?? 0;
@@ -583,6 +587,17 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
               {exercise}
             </span>
             {isSingleDay && <span title="One Day a Week Only" className="flex items-center"><AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" /></span>}
+            {videoUrl && (
+              <button
+                type="button"
+                onClick={() => setShowVideoModal(true)}
+                className="inline-flex items-center justify-center p-1.5 rounded-lg text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 transition-all active:scale-95 flex-shrink-0 cursor-pointer"
+                title="Watch exercise form review video"
+                aria-label={`Watch form review video for ${exercise}`}
+              >
+                <Video className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
           {todayWorkout && (
             <div className="mt-1">
@@ -696,6 +711,16 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
         exerciseName={exercise}
         intensity={intensity}
       />
+
+      {videoUrl && (
+        <FormVideoModal
+          isOpen={showVideoModal}
+          onClose={() => setShowVideoModal(false)}
+          exerciseName={exercise}
+          videoUrl={videoUrl}
+          notes={userPlan.exerciseMetadata?.[exercise]?.notes}
+        />
+      )}
     </div>
   );
 }

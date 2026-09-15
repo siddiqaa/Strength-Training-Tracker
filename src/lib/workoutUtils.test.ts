@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise, parseWorkoutDate, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue, calculate60DayVolumeData } from './workoutUtils';
+import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise, parseWorkoutDate, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue, calculate60DayVolumeData, getYouTubeEmbedUrl, normalizeVideoUrl } from './workoutUtils';
 import { Workout, UserPlan, MUSCLE_GROUPS } from '../types';
 
 describe('createExerciseOrderItems', () => {
@@ -449,6 +449,67 @@ describe('calculate60DayVolumeData', () => {
     // Sum of all weekly buckets should match total volume of all sessions
     const weeklySum = result.weeklyBuckets.reduce((acc, b) => acc + b.totalVolume, 0);
     expect(weeklySum).toBe(16500);
+  });
+});
+
+describe('normalizeVideoUrl', () => {
+  it('should return empty string for null, undefined, or empty string', () => {
+    expect(normalizeVideoUrl(undefined)).toBe('');
+    expect(normalizeVideoUrl('')).toBe('');
+    expect(normalizeVideoUrl('   ')).toBe('');
+  });
+
+  it('should preserve existing https:// and http:// protocols', () => {
+    expect(normalizeVideoUrl('https://youtu.be/dQw4w9WgXcQ')).toBe('https://youtu.be/dQw4w9WgXcQ');
+    expect(normalizeVideoUrl('http://youtube.com/watch?v=dQw4w9WgXcQ')).toBe('http://youtube.com/watch?v=dQw4w9WgXcQ');
+  });
+
+  it('should prepend https:// if protocol is missing', () => {
+    expect(normalizeVideoUrl('youtu.be/dQw4w9WgXcQ')).toBe('https://youtu.be/dQw4w9WgXcQ');
+    expect(normalizeVideoUrl('www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+  });
+});
+
+describe('getYouTubeEmbedUrl', () => {
+  it('should return null for empty or invalid urls', () => {
+    expect(getYouTubeEmbedUrl(undefined)).toBeNull();
+    expect(getYouTubeEmbedUrl('')).toBeNull();
+    expect(getYouTubeEmbedUrl('https://example.com/video')).toBeNull();
+    expect(getYouTubeEmbedUrl('not a url')).toBeNull();
+  });
+
+  it('should extract video ID from standard youtube.com watch URLs', () => {
+    expect(getYouTubeEmbedUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ'))
+      .toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+  });
+
+  it('should extract video ID from shortened youtu.be URLs', () => {
+    expect(getYouTubeEmbedUrl('https://youtu.be/dQw4w9WgXcQ'))
+      .toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+  });
+
+  it('should extract video ID from youtube shorts URLs', () => {
+    expect(getYouTubeEmbedUrl('https://www.youtube.com/shorts/dQw4w9WgXcQ'))
+      .toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+  });
+
+  it('should extract video ID from embed URLs', () => {
+    expect(getYouTubeEmbedUrl('https://www.youtube.com/embed/dQw4w9WgXcQ'))
+      .toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+  });
+
+  it('should extract video ID from mobile m.youtube.com URLs', () => {
+    expect(getYouTubeEmbedUrl('https://m.youtube.com/watch?v=dQw4w9WgXcQ'))
+      .toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+  });
+
+  it('should extract timestamp offsets in seconds or combined units', () => {
+    expect(getYouTubeEmbedUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=45s'))
+      .toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=45');
+    expect(getYouTubeEmbedUrl('https://youtu.be/dQw4w9WgXcQ?t=1m30s'))
+      .toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=90');
+    expect(getYouTubeEmbedUrl('https://youtu.be/dQw4w9WgXcQ?start=65'))
+      .toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=65');
   });
 });
 
