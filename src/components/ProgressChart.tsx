@@ -113,7 +113,7 @@ const SingleExerciseChart: React.FC<{
       const entry = dataByDate.get(dateStr);
       entry[w.intensity] = plotVal;
       entry[`${w.intensity}_rpe`] = w.rpe;
-      entry[`${w.intensity}_ga`] = isGoalAchieved(w);
+      entry[`${w.intensity}_ga`] = isGoalAchieved(w, userPlan);
       entry[`${w.intensity}_isBW`] = isBw;
       entry[`${w.intensity}_reps`] = totalReps;
     });

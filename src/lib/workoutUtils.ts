@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Workout, ExerciseOrderItem, Intensity, UserPlan, ExerciseEquipment } from '../types';
+import { Workout, ExerciseOrderItem, Intensity, UserPlan, ExerciseEquipment, PlannedSet } from '../types';
 
 export { type ExerciseOrderItem };
 
@@ -168,29 +168,63 @@ export function getLastDayWorkoutForExercise(
 
 /**
  * Calculates if the goal was achieved for a workout entry.
- * Goal Achieved (GA) = true if each set logged meets or exceeds the target reps across the target sets.
+ * Goal Achieved (GA) = true if each set logged meets or exceeds the target reps across all target sets.
+ * Evaluates strictly against explicit targets defined in userPlan or on the workout document,
+ * without synthetic fallback targets.
  */
-export function isGoalAchieved(workout: Workout): boolean {
-  const targetSets = workout.targetSets || 0;
-  const targetRepsStr = workout.targetReps || '';
-  
-  if (targetSets === 0 || !targetRepsStr) return false;
+export function isGoalAchieved(workout: Workout, userPlan?: UserPlan): boolean {
+  // 1. Locate the exercise in userPlan for the workout intensity (case-insensitive & whitespace-trimmed)
+  let planTarget: PlannedSet | undefined = userPlan?.[workout.intensity]?.[workout.exerciseName];
+  if (!planTarget && userPlan?.[workout.intensity]) {
+    const dayPlan = userPlan[workout.intensity];
+    const trimmed = workout.exerciseName?.trim().toLowerCase();
+    for (const [name, target] of Object.entries(dayPlan)) {
+      if (name.trim().toLowerCase() === trimmed) {
+        planTarget = target;
+        break;
+      }
+    }
+  }
 
-  const repMatch = targetRepsStr.match(/\d+/);
-  if (!repMatch) return false;
-  const targetRepsValue = parseInt(repMatch[0], 10);
+  // 2. Strict target sets calculation:
+  // Must come from explicit planTarget.sets or workout.targetSets (no fallback sets)
+  const explicitTargetSets = planTarget?.sets && Number(planTarget.sets) > 0
+    ? Number(planTarget.sets)
+    : (workout.targetSets && Number(workout.targetSets) > 0 ? Number(workout.targetSets) : 0);
 
-  // Check the sets that were actually targetted
+  // If set3 was logged with actual reps (> 0), at least 3 sets were performed in this session,
+  // so set 3 must be evaluated.
+  const hasSet3 = workout.set3 !== undefined && workout.set3 !== null && Number(workout.set3) > 0;
+  const targetSets = hasSet3 ? Math.max(explicitTargetSets, 3) : explicitTargetSets;
+
+  if (targetSets <= 0) {
+    return false;
+  }
+
+  // 3. Strict target reps calculation:
+  // Must come from explicit planTarget.reps or workout.targetReps as a single rep target value
+  const rawTargetReps = planTarget?.reps ?? workout.targetReps;
+  if (rawTargetReps === undefined || rawTargetReps === null || String(rawTargetReps).trim() === '') {
+    return false;
+  }
+
+  const targetRepsValue = parseInt(String(rawTargetReps).trim(), 10);
+  if (isNaN(targetRepsValue) || targetRepsValue <= 0) {
+    return false;
+  }
+
+  // 4. Evaluate all target sets
   const set1 = Number(workout.set1) || 0;
   const set2 = Number(workout.set2) || 0;
   const set3 = Number(workout.set3) || 0;
-  
   const sets = [set1, set2, set3];
-  
+
   for (let i = 0; i < targetSets; i++) {
-    if ((sets[i] || 0) < targetRepsValue) return false;
+    if ((sets[i] || 0) < targetRepsValue) {
+      return false;
+    }
   }
-  
+
   return true;
 }
 

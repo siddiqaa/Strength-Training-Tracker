@@ -53,13 +53,22 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
     if (dayPlan[exercise]) {
       delete dayPlan[exercise];
     } else {
-      const defaultData = 
+      const defaultSets = intensity === 'Light' ? 2 : 3;
+      const defaultReps = intensity === 'Medium' ? '12' : (intensity === 'Light' ? '15' : '8');
+      const existingData = 
+        newPlan[intensity]?.[exercise] ||
         newPlan.Heavy[exercise] || 
         newPlan.Light[exercise] || 
-        newPlan.Medium[exercise] || 
-        { weight: 50, sets: 3, reps: '8' };
+        newPlan.Medium[exercise];
+      
+      const parsedExistingReps = existingData?.reps ? parseInt(String(existingData.reps).trim(), 10) : NaN;
         
-      dayPlan[exercise] = { ...defaultData };
+      dayPlan[exercise] = { 
+        weight: existingData?.weight ?? 50, 
+        sets: existingData?.sets ?? defaultSets, 
+        reps: !isNaN(parsedExistingReps) && parsedExistingReps > 0 ? String(parsedExistingReps) : defaultReps,
+        isBW: existingData?.isBW ?? false
+      };
     }
     
     newPlan[intensity] = dayPlan;
@@ -73,7 +82,11 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
         ...prev[intensity],
         [exercise]: {
           ...prev[intensity][exercise],
-          [field]: field === 'isBW' ? Boolean(value) : (field === 'reps' ? String(value) : Number(value))
+          [field]: field === 'isBW' 
+            ? Boolean(value) 
+            : (field === 'reps' 
+                ? (value === '' ? '' : String(parseInt(String(value).trim(), 10) || '')) 
+                : Number(value))
         }
       }
     }));
@@ -233,6 +246,18 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
       }
       if (finalPlan.dayMetadata![int]!.restPeriod === undefined) {
         finalPlan.dayMetadata![int]!.restPeriod = 90;
+      }
+    });
+
+    // Ensure all planned sets have single rep targets
+    (['Heavy', 'Light', 'Medium'] as Intensity[]).forEach(int => {
+      if (finalPlan[int]) {
+        Object.entries(finalPlan[int]).forEach(([_, target]: [string, PlannedSet]) => {
+          if (target && target.reps !== undefined) {
+            const parsed = parseInt(String(target.reps).trim(), 10);
+            target.reps = String(isNaN(parsed) || parsed <= 0 ? (int === 'Medium' ? 12 : int === 'Light' ? 15 : 8) : parsed);
+          }
+        });
       }
     });
 
@@ -557,10 +582,12 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                               />
                               <span className="text-zinc-600 font-mono text-[10px]">x</span>
                               <input 
-                                type="text" 
+                                type="number" 
+                                min="1"
+                                step="1"
                                 value={target.reps} 
                                 onChange={e => updateTarget(exercise, intensity, 'reps', e.target.value)}
-                                className="w-8 bg-transparent text-center text-xs font-mono text-white focus:outline-none"
+                                className="w-10 bg-transparent text-center text-xs font-mono text-white focus:outline-none"
                                 title="Reps"
                               />
                               <span className="text-zinc-600 font-mono text-[10px]">@</span>
@@ -746,11 +773,13 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                                 />
                                 <span className="text-zinc-600 font-mono text-xs">x</span>
                                 <input 
-                                  type="text" 
+                                  type="number" 
+                                  min="1"
+                                  step="1"
                                   title="Reps"
                                   value={target.reps} 
                                   onChange={e => updateTarget(exercise, intensity, 'reps', e.target.value)}
-                                  className="w-10 bg-transparent border-none p-1 text-center text-sm font-mono text-white focus:outline-none focus:bg-zinc-800 rounded"
+                                  className="w-12 bg-transparent border-none p-1 text-center text-sm font-mono text-white focus:outline-none focus:bg-zinc-800 rounded"
                                 />
                                 <span className="text-zinc-600 font-mono text-xs">@</span>
                                 {target.isBW ? (

@@ -100,6 +100,23 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
           }
         }
 
+        // Migrate any legacy rep ranges in stored plan to a single rep target value
+        (['Heavy', 'Light', 'Medium'] as Intensity[]).forEach(int => {
+          if (rawData[int]) {
+            Object.entries(rawData[int]).forEach(([_, plannedSet]: [string, any]) => {
+              if (plannedSet && plannedSet.reps !== undefined) {
+                const repStr = String(plannedSet.reps).trim();
+                if (repStr.includes('-')) {
+                  const parts = repStr.split('-').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+                  const singleTarget = parts.length > 0 ? parts[parts.length - 1] : (int === 'Medium' ? 12 : int === 'Light' ? 15 : 8);
+                  plannedSet.reps = String(singleTarget);
+                  needsPurge = true;
+                }
+              }
+            });
+          }
+        });
+
         if (needsPurge) {
           setDoc(planRef, rawData).catch(error => handleFirestoreError(error, OperationType.WRITE, `userPlans/${auth.currentUser?.uid}`));
         }
@@ -151,7 +168,7 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
           for (const exercise of allExercises) {
             const target = plan[exercise] || {};
             const expectedSets = target.sets || 3;
-            const targetReps = parseInt(target.reps?.split('-')?.[0]) || parseInt(target.reps) || 8;
+            const targetReps = parseInt(target.reps) || (int === 'Medium' ? 12 : (int === 'Light' ? 15 : 8));
             const isTargetBW = !!target.isBW;
             
             let baseWeight = isTargetBW ? 0 : target.weight;
@@ -320,11 +337,11 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
           <div className="mb-8 p-3 bg-zinc-950/50 border border-zinc-800/50 rounded-xl text-zinc-400 text-xs flex flex-col sm:flex-row gap-4 items-center justify-center">
             <span className="font-bold text-zinc-300 uppercase tracking-widest text-[10px]">Target Sets, Reps, Rest:</span>
             <div className="flex flex-wrap justify-center gap-3">
-               <span className="text-red-400 font-mono whitespace-nowrap">Heavy: 3×6-8 ({userPlan.dayMetadata?.Heavy?.restPeriod ?? 90}s rest)</span>
+               <span className="text-red-400 font-mono whitespace-nowrap">Heavy: 3×8 ({userPlan.dayMetadata?.Heavy?.restPeriod ?? 90}s rest)</span>
                <span className="text-zinc-700 hidden sm:inline">|</span>
                <span className="text-blue-400 font-mono whitespace-nowrap">Light: 2×15 ({userPlan.dayMetadata?.Light?.restPeriod ?? 90}s rest)</span>
                <span className="text-zinc-700 hidden sm:inline">|</span>
-               <span className="text-orange-400 font-mono whitespace-nowrap">Medium: 3×10-12 ({userPlan.dayMetadata?.Medium?.restPeriod ?? 90}s rest)</span>
+               <span className="text-orange-400 font-mono whitespace-nowrap">Medium: 3×12 ({userPlan.dayMetadata?.Medium?.restPeriod ?? 90}s rest)</span>
             </div>
           </div>
 
@@ -503,7 +520,7 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
     }
   }, [target?.weight, todayWorkout, isTargetBW]);
 
-  const expectedSets = target.sets || 3;
+  const expectedSets = target?.sets !== undefined ? Number(target.sets) : 3;
 
   const handleLog = async () => {
     if (!auth.currentUser) return;
@@ -524,8 +541,8 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
         ...(expectedSets >= 3 ? { set3: isNaN(s3) ? 0 : s3 } : {}),
         intensity,
         targetWeight: isTargetBW ? 0 : (target?.weight !== undefined ? Number(target.weight) : safeWeight),
-        targetReps: target?.reps !== undefined ? String(target.reps) : '8',
-        targetSets: expectedSets || 3,
+        targetReps: target?.reps !== undefined ? String(target.reps) : '',
+        targetSets: target?.sets !== undefined ? Number(target.sets) : 0,
         rpe: rpe || 'M',
         date: serverTimestamp(),
         isBW: isTargetBW,

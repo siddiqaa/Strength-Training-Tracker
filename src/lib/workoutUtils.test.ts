@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise, parseWorkoutDate, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue, calculate60DayVolumeData, calculateEffectiveWeight, getYouTubeEmbedUrl, normalizeVideoUrl } from './workoutUtils';
+import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise, parseWorkoutDate, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue, calculate60DayVolumeData, calculateEffectiveWeight, getYouTubeEmbedUrl, normalizeVideoUrl, isGoalAchieved } from './workoutUtils';
 import { Workout, UserPlan, MUSCLE_GROUPS } from '../types';
 
 describe('createExerciseOrderItems', () => {
@@ -621,6 +621,122 @@ describe('calculate60DayVolumeData with equipment', () => {
     const bbBench = result.sessions[0].exercises.find(e => e.exerciseName === 'Barbell Bench Press');
     expect(bbBench?.effectiveWeight).toBe(135);
     expect(bbBench?.volume).toBe(3240);
+  });
+});
+
+describe('isGoalAchieved', () => {
+  const plan: UserPlan = {
+    userId: 'u1',
+    Heavy: {
+      'Bench Press': { weight: 200, sets: 3, reps: '8' },
+    },
+    Light: {
+      'Bench Press': { weight: 120, sets: 2, reps: '15' },
+    },
+    Medium: {
+      'Bench Press': { weight: 150, sets: 3, reps: '12' },
+      'Incline Dumbbell': { weight: 50, sets: 3, reps: '12' },
+    }
+  };
+
+  it('should return false for Medium Bench Press when reps do not meet the single target of 12 across all 3 sets', () => {
+    const workoutWith10Reps: Workout = {
+      userId: 'u1',
+      exerciseName: 'Bench Press',
+      intensity: 'Medium',
+      weight: 150,
+      set1: 10,
+      set2: 10,
+      set3: 10,
+      targetSets: 3,
+      targetReps: '12',
+      date: Date.now()
+    };
+    // Should NOT be achieved because 10 does not hit the target of 12
+    expect(isGoalAchieved(workoutWith10Reps, plan)).toBe(false);
+  });
+
+  it('should return false if only 2 sets hit 12 and the third set misses', () => {
+    const workoutMissedThirdSet: Workout = {
+      userId: 'u1',
+      exerciseName: 'Bench Press',
+      intensity: 'Medium',
+      weight: 150,
+      set1: 12,
+      set2: 12,
+      set3: 10,
+      targetSets: 3,
+      targetReps: '12',
+      date: Date.now()
+    };
+    expect(isGoalAchieved(workoutMissedThirdSet, plan)).toBe(false);
+  });
+
+  it('should return true when all 3 sets hit the single rep target of 12 or more', () => {
+    const successfulWorkout: Workout = {
+      userId: 'u1',
+      exerciseName: 'Bench Press',
+      intensity: 'Medium',
+      weight: 150,
+      set1: 12,
+      set2: 12,
+      set3: 12,
+      targetSets: 3,
+      targetReps: '12',
+      date: Date.now()
+    };
+    expect(isGoalAchieved(successfulWorkout, plan)).toBe(true);
+  });
+
+  it('should use plan sets and reps target if workout document has outdated or missing targetSets', () => {
+    const workoutWithStaleTargetSets: Workout = {
+      userId: 'u1',
+      exerciseName: 'Bench Press',
+      intensity: 'Medium',
+      weight: 150,
+      set1: 12,
+      set2: 12,
+      // set3 not logged or 0
+      set3: 0,
+      targetSets: 2, // stale target sets on doc
+      targetReps: '12',
+      date: Date.now()
+    };
+    // The plan specifies 3 sets for Medium Bench Press, so missing set3 fails goal achieved
+    expect(isGoalAchieved(workoutWithStaleTargetSets, plan)).toBe(false);
+  });
+
+  it('should return false for Medium Bench Press with 12, 12, 9 reps when plan specifies 12 reps, but true if evaluated without plan using doc targetReps 8', () => {
+    const workout12_12_9: Workout = {
+      userId: 'u1',
+      exerciseName: 'Bench Press',
+      intensity: 'Medium',
+      weight: 150,
+      set1: 12,
+      set2: 12,
+      set3: 9,
+      targetSets: 2, // e.g. stale targetSets on doc
+      targetReps: '8', // e.g. recorded targetReps on doc
+      date: Date.now()
+    };
+    // With plan: Medium Bench Press target is 12 reps across 3 sets, so set 3 (9 reps) fails goal achieved
+    expect(isGoalAchieved(workout12_12_9, plan)).toBe(false);
+    // Without plan and without synthetic fallbacks: uses doc's recorded targetReps ('8'), so sets 12, 12, 9 all >= 8
+    expect(isGoalAchieved(workout12_12_9, undefined)).toBe(true);
+  });
+
+  it('should return false if target sets are missing and sets are incomplete', () => {
+    const incompleteWorkout: Workout = {
+      userId: 'u1',
+      exerciseName: 'Incline Dumbbell',
+      intensity: 'Medium',
+      weight: 50,
+      set1: 12,
+      set2: 11,
+      set3: 10,
+      date: Date.now()
+    };
+    expect(isGoalAchieved(incompleteWorkout, plan)).toBe(false);
   });
 });
 
