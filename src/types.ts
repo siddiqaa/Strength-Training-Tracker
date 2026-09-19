@@ -44,6 +44,7 @@ export interface ExerciseMetadata {
   additionalRest?: number;
   videoUrl?: string;
   equipment?: ExerciseEquipment;
+  isInactive?: boolean;
 }
 
 export interface DayMetadata {

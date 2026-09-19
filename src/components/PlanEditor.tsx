@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlan, Intensity, PlannedSet, MUSCLE_GROUPS, ExerciseEquipment, EXERCISE_EQUIPMENT_OPTIONS } from '../types';
 import { getOrderedExerciseNames, createExerciseOrderItems, normalizeVideoUrl, calculateEffectiveWeight } from '../lib/workoutUtils';
-import { Plus, Trash2, ArrowUp, ArrowDown, Download, MessageSquare, AlertCircle, Save, X, Video, ExternalLink } from 'lucide-react';
+import { Plus, Trash2, ArrowUp, ArrowDown, Download, MessageSquare, AlertCircle, Save, X, Video, ExternalLink, Archive, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -17,12 +17,14 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
   const [error, setError] = useState('');
   const [exerciseToDelete, setExerciseToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
 
   const [exercises, setExercises] = useState<string[]>(() => {
     const allActive = new Set<string>();
     (['Heavy', 'Light', 'Medium'] as Intensity[]).forEach(int => {
       Object.keys(userPlan[int] || {}).forEach(ex => allActive.add(ex));
     });
+    Object.keys(userPlan.exerciseMetadata || {}).forEach(ex => allActive.add(ex));
     return getOrderedExerciseNames(
       userPlan.exerciseOrder,
       Array.from(allActive)
@@ -35,6 +37,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
     (['Heavy', 'Light', 'Medium'] as Intensity[]).forEach(int => {
       Object.keys(userPlan[int] || {}).forEach(ex => allActive.add(ex));
     });
+    Object.keys(userPlan.exerciseMetadata || {}).forEach(ex => allActive.add(ex));
     setExercises(
       getOrderedExerciseNames(
         userPlan.exerciseOrder,
@@ -89,7 +92,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
     }));
   };
 
-  const updateMetadata = (exercise: string, field: 'muscleGroup' | 'pushPull' | 'notes' | 'additionalRest' | 'videoUrl' | 'equipment', value: string | number | undefined) => {
+  const updateMetadata = (exercise: string, field: 'muscleGroup' | 'pushPull' | 'notes' | 'additionalRest' | 'videoUrl' | 'equipment' | 'isInactive', value: string | number | boolean | undefined) => {
     setEditedPlan(prev => ({
       ...prev,
       exerciseMetadata: {
@@ -100,6 +103,26 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
         }
       }
     }));
+  };
+
+  const activeExercises = exercises.filter(ex => !editedPlan.exerciseMetadata?.[ex]?.isInactive);
+  const inactiveExercises = exercises.filter(ex => !!editedPlan.exerciseMetadata?.[ex]?.isInactive);
+
+  const toggleInactive = async (exercise: string, makeInactive: boolean, autoPersist = false) => {
+    const newPlan = {
+      ...editedPlan,
+      exerciseMetadata: {
+        ...(editedPlan.exerciseMetadata || {}),
+        [exercise]: {
+          ...(editedPlan.exerciseMetadata?.[exercise] || {}),
+          isInactive: makeInactive
+        }
+      }
+    };
+    setEditedPlan(newPlan);
+    if (autoPersist && onSave) {
+      await onSave(newPlan, false);
+    }
   };
 
   const promptRemoveExercise = (exercise: string) => {
@@ -155,12 +178,36 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
     setExercises(newExercises);
   };
 
+  const moveActiveExercise = (exercise: string, direction: -1 | 1) => {
+    const activeList = exercises.filter(ex => !editedPlan.exerciseMetadata?.[ex]?.isInactive);
+    const currentActiveIndex = activeList.indexOf(exercise);
+    if (currentActiveIndex === -1) return;
+    const targetActiveIndex = currentActiveIndex + direction;
+    if (targetActiveIndex < 0 || targetActiveIndex >= activeList.length) return;
+
+    const targetExercise = activeList[targetActiveIndex];
+    const idx1 = exercises.indexOf(exercise);
+    const idx2 = exercises.indexOf(targetExercise);
+    if (idx1 === -1 || idx2 === -1) return;
+
+    const newExercises = [...exercises];
+    newExercises[idx1] = targetExercise;
+    newExercises[idx2] = exercise;
+    setExercises(newExercises);
+  };
+
   const handleAddExercise = () => {
     const normalized = newExercise.trim();
     if (!normalized) return;
     
     if (exercises.includes(normalized)) {
-      setError('Exercise already exists');
+      if (editedPlan.exerciseMetadata?.[normalized]?.isInactive) {
+        toggleInactive(normalized, false);
+        setNewExercise('');
+        setError('');
+        return;
+      }
+      setError('Exercise already exists in your plan');
       return;
     }
     
@@ -202,7 +249,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
     doc.setFontSize(14);
     doc.text('Exercise Plan', 14, 32);
 
-    const planRows = exercises.map(ex => {
+    const planRows = activeExercises.map(ex => {
       const formatCell = (day: PlannedSet | undefined) => {
         if (!day) return '-';
         return `${day.sets}x${day.reps} @ ${day.isBW ? 'BW' : day.weight}`;
@@ -249,6 +296,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
 
     const volumeData = Object.keys(editedPlan.exerciseMetadata || {}).reduce((acc, exercise) => {
       const meta = editedPlan.exerciseMetadata![exercise];
+      if (meta.isInactive) return acc;
       if (meta.muscleGroup && meta.pushPull) {
         const key = `${meta.pushPull}-${meta.muscleGroup}`;
         if (!acc[key]) {
@@ -383,7 +431,12 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
       <div className="border border-zinc-800 rounded-2xl overflow-hidden bg-zinc-900/30">
         {/* Mobile View */}
         <div className="md:hidden divide-y divide-zinc-800">
-          {exercises.map((exercise, idx) => (
+          {activeExercises.length === 0 && (
+            <div className="p-8 text-center text-zinc-500 font-mono text-xs uppercase tracking-widest">
+              No active exercises in plan.
+            </div>
+          )}
+          {activeExercises.map((exercise, idx) => (
             <div key={exercise} className="p-4 space-y-4">
               <div className="flex justify-between items-start gap-4">
                 <div className="flex-1 space-y-3">
@@ -437,7 +490,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                 <div className="flex flex-col gap-2">
                   <div className="flex gap-1">
                     <button 
-                      onClick={() => moveExercise(idx, -1)} 
+                      onClick={() => moveActiveExercise(exercise, -1)} 
                       disabled={idx === 0}
                       className="p-2 text-zinc-500 hover:text-white disabled:opacity-30 bg-zinc-900 border border-zinc-800 rounded-lg transition-colors"
                       title="Move Up"
@@ -445,21 +498,30 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                       <ArrowUp className="w-4 h-4" />
                     </button>
                     <button 
-                      onClick={() => moveExercise(idx, 1)} 
-                      disabled={idx === exercises.length - 1}
+                      onClick={() => moveActiveExercise(exercise, 1)} 
+                      disabled={idx === activeExercises.length - 1}
                       className="p-2 text-zinc-500 hover:text-white disabled:opacity-30 bg-zinc-900 border border-zinc-800 rounded-lg transition-colors"
                       title="Move Down"
                     >
                       <ArrowDown className="w-4 h-4" />
                     </button>
                   </div>
-                  <button 
-                    onClick={() => promptRemoveExercise(exercise)}
-                    className="p-2 text-zinc-500 hover:text-red-500 bg-zinc-900 border border-zinc-800 rounded-lg transition-colors"
-                    title="Remove Exercise"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex gap-1">
+                    <button 
+                      onClick={() => toggleInactive(exercise, true, true)}
+                      className="p-2 text-zinc-500 hover:text-amber-400 bg-zinc-900 border border-zinc-800 rounded-lg transition-colors"
+                      title="Deactivate (Keep Logs)"
+                    >
+                      <Archive className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => promptRemoveExercise(exercise)}
+                      className="p-2 text-zinc-500 hover:text-red-500 bg-zinc-900 border border-zinc-800 rounded-lg transition-colors"
+                      title="Delete or Deactivate"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
               
@@ -600,7 +662,14 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
               </tr>
             </thead>
             <tbody>
-              {exercises.map((exercise, idx) => (
+              {activeExercises.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-zinc-500 font-mono text-xs uppercase tracking-widest">
+                    No active exercises in plan.
+                  </td>
+                </tr>
+              )}
+              {activeExercises.map((exercise, idx) => (
                 <React.Fragment key={exercise}>
                   <tr className="hover:bg-zinc-900/30 transition-colors">
                     <td className="p-4 font-bold text-white text-sm align-top">
@@ -713,7 +782,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                     <td className="p-4 align-middle">
                       <div className="flex items-center justify-end gap-1">
                         <button 
-                          onClick={() => moveExercise(idx, -1)} 
+                          onClick={() => moveActiveExercise(exercise, -1)} 
                           disabled={idx === 0}
                           className="p-1.5 text-zinc-500 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-500 rounded-md hover:bg-zinc-800 transition-colors"
                           title="Move Up"
@@ -721,17 +790,24 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
                           <ArrowUp className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => moveExercise(idx, 1)} 
-                          disabled={idx === exercises.length - 1}
+                          onClick={() => moveActiveExercise(exercise, 1)} 
+                          disabled={idx === activeExercises.length - 1}
                           className="p-1.5 text-zinc-500 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-500 rounded-md hover:bg-zinc-800 transition-colors"
                           title="Move Down"
                         >
                           <ArrowDown className="w-4 h-4" />
                         </button>
                         <button 
+                          onClick={() => toggleInactive(exercise, true, true)}
+                          className="p-1.5 text-zinc-500 hover:text-amber-400 rounded-md hover:bg-amber-500/10 transition-colors"
+                          title="Deactivate (Keep Logs)"
+                        >
+                          <Archive className="w-4 h-4" />
+                        </button>
+                        <button 
                           onClick={() => promptRemoveExercise(exercise)}
-                          className="p-1.5 text-zinc-500 hover:text-red-500 rounded-md hover:bg-red-500/10 transition-colors ml-2"
-                          title="Remove Exercise entirely"
+                          className="p-1.5 text-zinc-500 hover:text-red-500 rounded-md hover:bg-red-500/10 transition-colors"
+                          title="Delete or Deactivate"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -801,6 +877,129 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
         </div>
       </div>
 
+      {/* Inactive Exercises Section */}
+      <div className="mt-6 border border-zinc-800 rounded-2xl overflow-hidden bg-zinc-900/20">
+        <button
+          type="button"
+          onClick={() => setShowInactive(!showInactive)}
+          className="flex items-center justify-between w-full p-4 bg-zinc-900/40 hover:bg-zinc-900/70 transition-colors text-left"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-zinc-800/80 rounded-xl text-zinc-400">
+              <Archive className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-black text-white uppercase tracking-wider">
+                  Inactive Exercises
+                </span>
+                <span className="text-xs font-mono font-bold bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">
+                  {inactiveExercises.length}
+                </span>
+              </div>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                Removed from daily workout views. Past logs, personal records, and configurations are preserved.
+              </p>
+            </div>
+          </div>
+          {showInactive ? (
+            <ChevronUp className="w-5 h-5 text-zinc-500" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-zinc-500" />
+          )}
+        </button>
+
+        {showInactive && (
+          <div className="p-4 border-t border-zinc-800/60 bg-zinc-950/40">
+            {inactiveExercises.length === 0 ? (
+              <div className="py-6 text-center text-xs text-zinc-500 font-mono">
+                No inactive exercises. Click the Archive icon on any exercise row above to pause it without losing logs.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {inactiveExercises.map((exercise) => {
+                  const meta = editedPlan.exerciseMetadata?.[exercise];
+                  const hasHeavy = !!editedPlan.Heavy?.[exercise];
+                  const hasLight = !!editedPlan.Light?.[exercise];
+                  const hasMedium = !!editedPlan.Medium?.[exercise];
+
+                  return (
+                    <div
+                      key={exercise}
+                      className="p-4 bg-zinc-900/60 border border-zinc-800/80 rounded-xl flex flex-col justify-between gap-3 hover:border-zinc-700 transition-colors"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-sm font-bold text-white">
+                            {exercise}
+                          </span>
+                          <span className="text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-md flex-shrink-0">
+                            Inactive
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1.5 text-[10px]">
+                          {meta?.equipment && (
+                            <span className="font-mono bg-zinc-950 text-zinc-400 border border-zinc-800 px-2 py-0.5 rounded capitalize">
+                              {meta.equipment}
+                            </span>
+                          )}
+                          {meta?.muscleGroup && (
+                            <span className="bg-zinc-950 text-zinc-400 border border-zinc-800 px-2 py-0.5 rounded">
+                              {meta.muscleGroup}
+                            </span>
+                          )}
+                          {meta?.pushPull && (
+                            <span className="bg-zinc-950 text-zinc-400 border border-zinc-800 px-2 py-0.5 rounded">
+                              {meta.pushPull}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-500 pt-0.5">
+                          <span>Configured:</span>
+                          {hasHeavy && <span className="text-red-400 font-bold">Heavy</span>}
+                          {hasLight && <span className="text-blue-400 font-bold">Light</span>}
+                          {hasMedium && <span className="text-orange-400 font-bold">Medium</span>}
+                          {!hasHeavy && !hasLight && !hasMedium && <span className="text-zinc-600">None</span>}
+                        </div>
+
+                        {meta?.notes && (
+                          <p className="text-[11px] text-zinc-500 italic line-clamp-1">
+                            "{meta.notes}"
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/80">
+                        <button
+                          type="button"
+                          onClick={() => promptRemoveExercise(exercise)}
+                          className="p-1.5 text-zinc-500 hover:text-red-400 rounded-lg hover:bg-zinc-800 transition-colors text-xs flex items-center gap-1.5"
+                          title="Delete permanently (removes logs)"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => toggleInactive(exercise, false, true)}
+                          className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 active:scale-95"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          Reactivate
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="mt-8 border border-zinc-800 rounded-2xl overflow-hidden bg-zinc-900/30">
         <div className="bg-zinc-900 border-b border-zinc-800 p-4">
           <h3 className="text-lg font-black text-white tracking-tight">Weekly Set Volume by Push/Pull & Muscle Group</h3>
@@ -829,6 +1028,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
 
               const volumeData = Object.keys(editedPlan.exerciseMetadata || {}).reduce((acc, exercise) => {
                 const meta = editedPlan.exerciseMetadata![exercise];
+                if (meta.isInactive) return acc;
                 if (meta.muscleGroup && meta.pushPull) {
                   const key = `${meta.pushPull}-${meta.muscleGroup}`;
                   if (!acc[key]) {
@@ -959,7 +1159,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
           <div className="flex items-center justify-between text-white">
             <h3 className="text-lg font-black tracking-tight flex items-center gap-2 text-red-500">
               <AlertCircle className="w-5 h-5" />
-              Delete Exercise
+              Remove Exercise
             </h3>
             <button 
               onClick={() => setExerciseToDelete(null)}
@@ -970,25 +1170,55 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
             </button>
           </div>
           <p className="text-sm text-zinc-300">
-            Are you sure you want to delete <span className="font-bold text-white">"{exerciseToDelete}"</span>?
+            How would you like to handle <span className="font-bold text-white">"{exerciseToDelete}"</span>?
           </p>
-          <p className="text-xs text-zinc-400 bg-red-500/10 border border-red-500/20 p-3 rounded-xl text-red-300">
-            This will remove the exercise from your workout plan and permanently delete all logged workouts for this exercise.
-          </p>
-          <div className="flex gap-3 pt-2 justify-end">
+          
+          <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-1">
+            <div className="flex items-center gap-2 text-xs font-bold text-amber-400">
+              <Archive className="w-4 h-4" />
+              <span>Recommended: Deactivate Exercise</span>
+            </div>
+            <p className="text-xs text-zinc-400">
+              Removes it from your active daily workout lists. All previous workout logs, volume history, and charts remain intact, and you can reactivate it anytime.
+            </p>
+          </div>
+
+          <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl space-y-1">
+            <div className="flex items-center gap-2 text-xs font-bold text-red-400">
+              <Trash2 className="w-4 h-4" />
+              <span>Permanent Deletion</span>
+            </div>
+            <p className="text-xs text-zinc-400">
+              Permanently wipes this exercise and deletes all historical logged workouts for it.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2 pt-2 justify-end">
             <button 
               onClick={() => setExerciseToDelete(null)}
               disabled={isDeleting}
-              className="px-4 py-2 bg-zinc-800 text-zinc-300 text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-zinc-700 transition-colors"
+              className="px-4 py-2.5 bg-zinc-800 text-zinc-300 text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-zinc-700 transition-colors order-3 sm:order-1"
             >
               Cancel
             </button>
             <button 
+              onClick={async () => {
+                const ex = exerciseToDelete;
+                setExerciseToDelete(null);
+                await toggleInactive(ex, true, true);
+              }}
+              disabled={isDeleting}
+              className="px-4 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-black uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-2 order-1 sm:order-2"
+            >
+              <Archive className="w-4 h-4" />
+              Deactivate (Keep Logs)
+            </button>
+            <button 
               onClick={() => confirmDeleteExercise(exerciseToDelete)}
               disabled={isDeleting}
-              className="px-4 py-2 bg-red-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-red-500 transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-2.5 bg-red-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-red-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 order-2 sm:order-3"
             >
-              {isDeleting ? 'Deleting...' : 'Delete Exercise'}
+              {isDeleting ? 'Deleting...' : 'Delete Permanently'}
             </button>
           </div>
         </div>

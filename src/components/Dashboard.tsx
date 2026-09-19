@@ -138,7 +138,7 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
         
           for (const { int, dayOffset } of days) {
             const plan = userPlan[int] || {};
-            const planExerciseKeys = Object.keys(plan);
+            const planExerciseKeys = Object.keys(plan).filter(ex => !userPlan.exerciseMetadata?.[ex]?.isInactive);
             const allExercises = getOrderedExerciseNames(
               userPlan.exerciseOrder,
               planExerciseKeys
@@ -337,11 +337,21 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
             </div>
             
             {(() => {
-              const planExercises = Object.keys(userPlan[intensity] || {});
+              const planExercises = Object.keys(userPlan[intensity] || {}).filter(
+                ex => !userPlan.exerciseMetadata?.[ex]?.isInactive
+              );
               const sortedExercises = getOrderedExerciseNames(
                 userPlan.exerciseOrder,
                 planExercises
               ).filter(ex => planExercises.includes(ex));
+
+              if (sortedExercises.length === 0) {
+                return (
+                  <div className="p-8 text-center bg-zinc-950/40 border border-zinc-800/80 rounded-2xl text-zinc-500 text-xs font-mono">
+                    No active exercises configured for {intensity} day. Visit the Editor tab to enable exercises or reactivate paused ones.
+                  </div>
+                );
+              }
 
               return sortedExercises.map((exercise) => {
                 const target = activePlan[exercise];

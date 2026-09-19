@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Workout } from '../types';
 import { getOrderedExerciseNames, isGoalAchieved, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue } from '../lib/workoutUtils';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { TrendingUp, Maximize2, Minimize2 } from 'lucide-react';
+import { TrendingUp, Maximize2, Minimize2, ChevronDown, ChevronUp, Archive } from 'lucide-react';
 
 const CustomProgressTooltip = ({ active, payload, label, hoveredIntensity, mouseYRatio }: any) => {
   if (!active || !payload || !payload.length) return null;
@@ -78,9 +78,10 @@ const SingleExerciseChart: React.FC<{
   exerciseName: string;
   workouts: Workout[];
   userPlan?: any;
+  isInactive?: boolean;
   isExpanded: boolean;
   onToggleExpand: () => void;
-}> = ({ exerciseName, workouts, userPlan, isExpanded, onToggleExpand }) => {
+}> = ({ exerciseName, workouts, userPlan, isInactive = false, isExpanded, onToggleExpand }) => {
   const [hoveredIntensity, setHoveredIntensity] = useState<string | null>(null);
   const [mouseYRatio, setMouseYRatio] = useState<number>(0.5);
 
@@ -166,16 +167,25 @@ const SingleExerciseChart: React.FC<{
     );
   };
 
+  const isArchivedOrInactive = isInactive || !!userPlan?.exerciseMetadata?.[exerciseName]?.isInactive;
+
   return (
-    <div className={`bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-4 sm:p-6 flex flex-col justify-between shadow-lg transition-all duration-300 ${
+    <div className={`border rounded-2xl p-4 sm:p-6 flex flex-col justify-between shadow-lg transition-all duration-300 ${
+      isArchivedOrInactive ? 'bg-zinc-950/40 border-zinc-800/60' : 'bg-zinc-950/60 border-zinc-800/80'
+    } ${
       isExpanded ? 'lg:col-span-2 border-orange-500/40 ring-1 ring-orange-500/20' : 'lg:col-span-1'
     }`}>
       <div className="flex items-center justify-between mb-4 gap-2">
         <div className="flex items-center gap-2">
           <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+            <span className={`w-2 h-2 rounded-full ${isArchivedOrInactive ? 'bg-amber-500' : 'bg-orange-500'}`}></span>
             {exerciseName}
           </h3>
+          {isArchivedOrInactive && (
+            <span className="text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">
+              Inactive
+            </span>
+          )}
           {isExerciseBW && (
             <span className="text-[10px] font-mono font-bold bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded-full">
               BW (Reps)
@@ -311,30 +321,69 @@ const SingleExerciseChart: React.FC<{
 
 export function ProgressChart({ workouts, userPlan }: { workouts: Workout[], userPlan?: any }) {
   const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
+  const [showInactive, setShowInactive] = useState<boolean>(true);
 
-  const exercises = useMemo(() => {
-    let planExercisesList: string[] = [];
+  const { activeExercises, inactiveExercises } = useMemo(() => {
+    const activePlanSet = new Set<string>();
+    const inactivePlanSet = new Set<string>();
+
     if (userPlan) {
-      const allActive = new Set<string>();
       (['Heavy', 'Light', 'Medium'] as const).forEach(int => {
-        Object.keys(userPlan[int] || {}).forEach(ex => allActive.add(ex));
+        Object.keys(userPlan[int] || {}).forEach(ex => {
+          if (userPlan.exerciseMetadata?.[ex]?.isInactive) {
+            inactivePlanSet.add(ex);
+          } else {
+            activePlanSet.add(ex);
+          }
+        });
       });
-      planExercisesList = getOrderedExerciseNames(
-        userPlan.exerciseOrder,
-        Array.from(allActive)
-      );
+
+      if (userPlan.exerciseMetadata) {
+        Object.keys(userPlan.exerciseMetadata).forEach(ex => {
+          if (userPlan.exerciseMetadata[ex]?.isInactive) {
+            inactivePlanSet.add(ex);
+            activePlanSet.delete(ex);
+          }
+        });
+      }
     }
-    
-    const planExercisesSet = new Set(planExercisesList);
+
+    // Historical exercises logged in workouts
     const historyExercises = workouts.map(w => w.exerciseName);
-    const historyOnlyExercises = Array.from(new Set(historyExercises))
-      .filter(ex => !planExercisesSet.has(ex))
+    const uniqueHistory = Array.from(new Set(historyExercises));
+
+    uniqueHistory.forEach(ex => {
+      if (!activePlanSet.has(ex)) {
+        inactivePlanSet.add(ex);
+      }
+    });
+
+    const orderedActive = getOrderedExerciseNames(
+      userPlan?.exerciseOrder,
+      Array.from(activePlanSet)
+    ).filter(ex => activePlanSet.has(ex));
+
+    const orderedInactiveFromPlan = getOrderedExerciseNames(
+      userPlan?.exerciseOrder,
+      Array.from(inactivePlanSet)
+    ).filter(ex => inactivePlanSet.has(ex));
+
+    const remainingInactive = Array.from(inactivePlanSet)
+      .filter(ex => !orderedInactiveFromPlan.includes(ex))
       .sort();
 
-    return [...planExercisesList, ...historyOnlyExercises];
+    const orderedInactive = [...orderedInactiveFromPlan, ...remainingInactive];
+
+    return {
+      activeExercises: orderedActive,
+      inactiveExercises: orderedInactive,
+    };
   }, [workouts, userPlan]);
 
-  if (workouts.length === 0 && (!userPlan || Object.keys(userPlan).length === 0)) return null;
+  const totalCount = activeExercises.length + inactiveExercises.length;
+  if (totalCount === 0 && workouts.length === 0 && (!userPlan || Object.keys(userPlan).length === 0)) {
+    return null;
+  }
 
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6 sm:p-8 shadow-xl mt-8">
@@ -345,23 +394,86 @@ export function ProgressChart({ workouts, userPlan }: { workouts: Workout[], use
         </h2>
       </div>
 
-      {exercises.length === 0 ? (
+      {activeExercises.length === 0 && inactiveExercises.length === 0 ? (
         <div className="p-8 text-center text-zinc-500 font-mono text-sm uppercase tracking-widest">
           No exercises available
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {exercises.map(exerciseName => (
-            <SingleExerciseChart 
-              key={exerciseName} 
-              exerciseName={exerciseName} 
-              workouts={workouts} 
-              userPlan={userPlan}
-              isExpanded={expandedExercise === exerciseName}
-              onToggleExpand={() => setExpandedExercise(prev => prev === exerciseName ? null : exerciseName)}
-            />
-          ))}
-        </div>
+        <>
+          {activeExercises.length > 0 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {activeExercises.map(exerciseName => (
+                <SingleExerciseChart 
+                  key={exerciseName} 
+                  exerciseName={exerciseName} 
+                  workouts={workouts} 
+                  userPlan={userPlan}
+                  isInactive={false}
+                  isExpanded={expandedExercise === exerciseName}
+                  onToggleExpand={() => setExpandedExercise(prev => prev === exerciseName ? null : exerciseName)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="p-6 text-center text-zinc-500 font-mono text-xs uppercase tracking-widest bg-zinc-950/40 border border-zinc-800/80 rounded-2xl">
+              No active exercises in current plan
+            </div>
+          )}
+
+          {inactiveExercises.length > 0 && (
+            <div className="mt-10 pt-8 border-t border-zinc-800/80">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                  <h3 className="text-xs sm:text-sm font-black text-zinc-300 uppercase tracking-widest flex items-center gap-2">
+                    <span>Inactive Exercises</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      {inactiveExercises.length}
+                    </span>
+                  </h3>
+                </div>
+
+                <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                  <span className="text-[11px] text-zinc-500 font-mono">
+                    Past performance charts for paused movements
+                  </span>
+                  <button
+                    onClick={() => setShowInactive(prev => !prev)}
+                    className="flex items-center gap-1.5 px-3 py-1 bg-zinc-800/70 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-700/60 rounded-lg text-xs font-mono transition-colors"
+                  >
+                    {showInactive ? (
+                      <>
+                        <ChevronUp className="w-3.5 h-3.5" />
+                        <span>Hide</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-3.5 h-3.5" />
+                        <span>Show ({inactiveExercises.length})</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {showInactive && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {inactiveExercises.map(exerciseName => (
+                    <SingleExerciseChart 
+                      key={exerciseName} 
+                      exerciseName={exerciseName} 
+                      workouts={workouts} 
+                      userPlan={userPlan}
+                      isInactive={true}
+                      isExpanded={expandedExercise === exerciseName}
+                      onToggleExpand={() => setExpandedExercise(prev => prev === exerciseName ? null : exerciseName)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

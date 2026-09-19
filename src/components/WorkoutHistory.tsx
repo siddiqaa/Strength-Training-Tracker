@@ -34,7 +34,11 @@ export function WorkoutHistory({ workouts, userPlan }: { workouts: Workout[], us
   if (userPlan) {
     const allActive = new Set<string>();
     (['Heavy', 'Light', 'Medium'] as const).forEach(int => {
-      Object.keys(userPlan[int] || {}).forEach(ex => allActive.add(ex));
+      Object.keys(userPlan[int] || {}).forEach(ex => {
+        if (!userPlan.exerciseMetadata?.[ex]?.isInactive) {
+          allActive.add(ex);
+        }
+      });
     });
     planExercisesList = getOrderedExerciseNames(
       userPlan.exerciseOrder,
@@ -45,7 +49,7 @@ export function WorkoutHistory({ workouts, userPlan }: { workouts: Workout[], us
   const planExercisesSet = new Set(planExercisesList);
   const historyExercises = workouts.map(w => w.exerciseName);
   const historyOnlyExercises = Array.from(new Set(historyExercises))
-    .filter(ex => !planExercisesSet.has(ex))
+    .filter(ex => !planExercisesSet.has(ex) && !userPlan?.exerciseMetadata?.[ex]?.isInactive)
     .sort();
 
   const exercises = [...planExercisesList, ...historyOnlyExercises];
@@ -107,39 +111,49 @@ export function WorkoutHistory({ workouts, userPlan }: { workouts: Workout[], us
             </tr>
           </thead>
           <tbody>
-            {exercises.map(exercise => {
-              const getHistoryForIntensity = (intensity: 'Heavy' | 'Light' | 'Medium') => 
-                workouts
-                  .filter(w => w.exerciseName === exercise && w.intensity === intensity)
-                  .sort((a, b) => {
-                    const dateA = typeof a.date === 'number' ? a.date : new Date(a.date).getTime();
-                    const dateB = typeof b.date === 'number' ? b.date : new Date(b.date).getTime();
-                    return dateB - dateA;
-                  });
+            {exercises.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="p-8 text-center text-zinc-500 font-mono text-xs uppercase tracking-widest">
+                  No active exercises in plan
+                </td>
+              </tr>
+            ) : (
+              exercises.map(exercise => {
+                const getHistoryForIntensity = (intensity: 'Heavy' | 'Light' | 'Medium') => 
+                  workouts
+                    .filter(w => w.exerciseName === exercise && w.intensity === intensity)
+                    .sort((a, b) => {
+                      const dateA = typeof a.date === 'number' ? a.date : new Date(a.date).getTime();
+                      const dateB = typeof b.date === 'number' ? b.date : new Date(b.date).getTime();
+                      return dateB - dateA;
+                    });
 
-              const heavyHistory = getHistoryForIntensity('Heavy');
-              const lightHistory = getHistoryForIntensity('Light');
-              const mediumHistory = getHistoryForIntensity('Medium');
+                const heavyHistory = getHistoryForIntensity('Heavy');
+                const lightHistory = getHistoryForIntensity('Light');
+                const mediumHistory = getHistoryForIntensity('Medium');
 
-              const heavy = lastHeavyDate ? heavyHistory.find(w => isSameDay(w.date, lastHeavyDate)) : undefined;
-              const light = lastLightDate ? lightHistory.find(w => isSameDay(w.date, lastLightDate)) : undefined;
-              const medium = lastMediumDate ? mediumHistory.find(w => isSameDay(w.date, lastMediumDate)) : undefined;
+                const heavy = lastHeavyDate ? heavyHistory.find(w => isSameDay(w.date, lastHeavyDate)) : undefined;
+                const light = lastLightDate ? lightHistory.find(w => isSameDay(w.date, lastLightDate)) : undefined;
+                const medium = lastMediumDate ? mediumHistory.find(w => isSameDay(w.date, lastMediumDate)) : undefined;
 
-              return (
-                <tr key={exercise} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
-                  <td className="p-1 pr-0 sm:p-2 font-normal text-white align-middle text-[9px] sm:text-xs leading-tight">{exercise}</td>
-                  <td className="p-0.5 sm:p-1 align-middle bg-red-500/5">
-                    <TableCell workout={heavy} history={heavyHistory} threshold={stagnationThreshold} />
-                  </td>
-                  <td className="p-1 align-middle bg-blue-500/5">
-                    <TableCell workout={light} history={lightHistory} threshold={stagnationThreshold} />
-                  </td>
-                  <td className="p-1 align-middle bg-orange-500/5">
-                    <TableCell workout={medium} history={mediumHistory} threshold={stagnationThreshold} />
-                  </td>
-                </tr>
-              );
-            })}
+                return (
+                  <tr key={exercise} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
+                    <td className="p-1 pr-0 sm:p-2 font-normal text-white align-middle text-[9px] sm:text-xs leading-tight">
+                      <span>{exercise}</span>
+                    </td>
+                    <td className="p-0.5 sm:p-1 align-middle bg-red-500/5">
+                      <TableCell workout={heavy} history={heavyHistory} threshold={stagnationThreshold} />
+                    </td>
+                    <td className="p-1 align-middle bg-blue-500/5">
+                      <TableCell workout={light} history={lightHistory} threshold={stagnationThreshold} />
+                    </td>
+                    <td className="p-1 align-middle bg-orange-500/5">
+                      <TableCell workout={medium} history={mediumHistory} threshold={stagnationThreshold} />
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
