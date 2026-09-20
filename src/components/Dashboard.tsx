@@ -469,6 +469,7 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
 
   const videoUrl = userPlan.exerciseMetadata?.[exercise]?.videoUrl?.trim();
   const equipment = userPlan.exerciseMetadata?.[exercise]?.equipment;
+  const exerciseNotes = userPlan.exerciseMetadata?.[exercise]?.notes?.trim();
 
   const baseRest = userPlan.dayMetadata?.[intensity]?.restPeriod ?? 90;
   const additionalRest = userPlan.exerciseMetadata?.[exercise]?.additionalRest ?? 0;
@@ -600,7 +601,7 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
   }
 
   return (
-    <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col md:grid md:grid-cols-12 gap-4 items-center hover:border-zinc-700 transition-colors">
+    <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col md:grid md:grid-cols-12 gap-4 items-center hover:border-zinc-700 transition-colors relative hover:z-20">
       <div className="flex items-center justify-between w-full md:contents">
         <div className="md:col-span-3 w-full font-bold text-white text-base md:text-sm flex flex-col">
           <div className="flex items-center gap-2 truncate">
@@ -640,12 +641,26 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
               </span>
             </div>
           )}
-          {/* Desktop Notes: Keep them under title for grid clarity */}
-          {userPlan.exerciseMetadata?.[exercise]?.notes && (
-            <div className="hidden md:block mt-1">
-              <p className="text-[10px] text-zinc-500 font-medium leading-tight italic line-clamp-2">
-                {userPlan.exerciseMetadata[exercise].notes}
+          {/* Desktop Notes: Keep them under title for grid clarity with full comment display on hover */}
+          {exerciseNotes && (
+            <div 
+              className="hidden md:block mt-1 relative group/note cursor-help"
+              title={exerciseNotes}
+            >
+              <p className="text-[10px] text-zinc-400 hover:text-zinc-200 font-medium leading-tight italic line-clamp-2 transition-colors">
+                {exerciseNotes}
               </p>
+
+              {/* Full comment display as tooltip */}
+              <div 
+                role="tooltip"
+                className="pointer-events-none absolute left-0 bottom-full mb-1.5 z-50 hidden group-hover/note:block w-80 max-w-sm p-3 bg-zinc-900/95 backdrop-blur-md border border-zinc-700/90 rounded-xl shadow-2xl text-[11px] text-zinc-200 font-normal leading-relaxed whitespace-pre-wrap break-words"
+              >
+                <div className="text-[9px] font-black uppercase tracking-widest text-orange-400 mb-1 flex items-center gap-1">
+                  <span>Exercise Note</span>
+                </div>
+                {exerciseNotes}
+              </div>
             </div>
           )}
         </div>
@@ -725,10 +740,13 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
       
       <div className="md:col-span-2 w-full flex flex-col gap-2">
         {/* Mobile Notes: Full width above button */}
-        {userPlan.exerciseMetadata?.[exercise]?.notes && (
-          <div className="md:hidden p-2.5 bg-orange-500/5 border-l-2 border-orange-500/20 rounded-r-xl mb-1">
+        {exerciseNotes && (
+          <div 
+            className="md:hidden p-2.5 bg-orange-500/5 border-l-2 border-orange-500/20 rounded-r-xl mb-1"
+            title={exerciseNotes}
+          >
             <p className="text-[11px] text-zinc-300 font-medium leading-relaxed italic whitespace-pre-wrap">
-              {userPlan.exerciseMetadata[exercise].notes}
+              {exerciseNotes}
             </p>
           </div>
         )}
