@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise, parseWorkoutDate, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue, calculate60DayVolumeData, calculateEffectiveWeight, getYouTubeEmbedUrl, normalizeVideoUrl, isGoalAchieved } from './workoutUtils';
+import { calculateShowDeloadBadge, getLastDeloadPeriod, formatDeloadPeriod, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise, parseWorkoutDate, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue, calculate60DayVolumeData, calculateEffectiveWeight, getYouTubeEmbedUrl, normalizeVideoUrl, isGoalAchieved } from './workoutUtils';
 import { Workout, UserPlan, MUSCLE_GROUPS } from '../types';
 
 describe('createExerciseOrderItems', () => {
@@ -173,6 +173,96 @@ describe('calculateShowDeloadBadge', () => {
     }
 
     expect(calculateShowDeloadBadge(workouts, referenceNow)).toBe(true);
+  });
+});
+
+describe('getLastDeloadPeriod', () => {
+  const referenceNow = new Date('2026-08-04T12:00:00');
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  it('should return null if there are no workouts', () => {
+    expect(getLastDeloadPeriod([], referenceNow)).toBeNull();
+  });
+
+  it('should return null if the user has trained consistently with no 6-day break', () => {
+    const workouts: { date: number }[] = [];
+    const todayTime = referenceNow.getTime();
+    for (let i = 0; i < 30; i += 2) {
+      workouts.push({ date: todayTime - (i * dayMs) });
+    }
+    expect(getLastDeloadPeriod(workouts, referenceNow)).toBeNull();
+  });
+
+  it('should identify a 6-consecutive-day rest period between workouts', () => {
+    const workouts: { date: number }[] = [];
+    const todayTime = referenceNow.getTime();
+
+    // Workout on Day 0
+    workouts.push({ date: todayTime });
+
+    // Days 1 to 6 are rest days (6 days: dayTime - 6*dayMs to dayTime - 1*dayMs)
+
+    // Workout on Day 7
+    workouts.push({ date: todayTime - (7 * dayMs) });
+
+    const result = getLastDeloadPeriod(workouts, referenceNow);
+    expect(result).not.toBeNull();
+    expect(result?.days).toBe(6);
+    expect(isSameDay(result!.start.getTime(), todayTime - (6 * dayMs))).toBe(true);
+    expect(isSameDay(result!.end.getTime(), todayTime - (1 * dayMs))).toBe(true);
+  });
+
+  it('should return the most recent deload period when multiple breaks exist', () => {
+    const workouts: { date: number }[] = [];
+    const todayTime = referenceNow.getTime();
+
+    // Workout on Day 0
+    workouts.push({ date: todayTime });
+    // Recent 7-day break: Days 1 to 7 are rest days
+    // Workout on Day 8
+    workouts.push({ date: todayTime - (8 * dayMs) });
+
+    // Older 10-day break: Days 12 to 21 are rest days
+    workouts.push({ date: todayTime - (11 * dayMs) });
+    workouts.push({ date: todayTime - (22 * dayMs) });
+
+    const result = getLastDeloadPeriod(workouts, referenceNow);
+    expect(result).not.toBeNull();
+    expect(result?.days).toBe(7);
+    expect(isSameDay(result!.start.getTime(), todayTime - (7 * dayMs))).toBe(true);
+    expect(isSameDay(result!.end.getTime(), todayTime - (1 * dayMs))).toBe(true);
+  });
+
+  it('should recognize an ongoing rest break of 6+ days up to today', () => {
+    const workouts: { date: number }[] = [];
+    const todayTime = referenceNow.getTime();
+
+    // Latest workout was 8 days ago
+    workouts.push({ date: todayTime - (8 * dayMs) });
+
+    const result = getLastDeloadPeriod(workouts, referenceNow);
+    expect(result).not.toBeNull();
+    expect(result?.days).toBe(8);
+    expect(isSameDay(result!.start.getTime(), todayTime - (7 * dayMs))).toBe(true);
+    expect(isSameDay(result!.end.getTime(), todayTime)).toBe(true);
+  });
+});
+
+describe('formatDeloadPeriod', () => {
+  it('should format dates within the same year cleanly', () => {
+    const start = new Date(2026, 7, 2); // Aug 2
+    const end = new Date(2026, 7, 7);   // Aug 7
+    const result = formatDeloadPeriod({ start, end, days: 6 });
+    expect(result).toContain('Aug 2');
+    expect(result).toContain('Aug 7');
+  });
+
+  it('should format dates across different years with years included', () => {
+    const start = new Date(2025, 11, 28); // Dec 28, 2025
+    const end = new Date(2026, 0, 4);     // Jan 4, 2026
+    const result = formatDeloadPeriod({ start, end, days: 7 });
+    expect(result).toContain('2025');
+    expect(result).toContain('2026');
   });
 });
 

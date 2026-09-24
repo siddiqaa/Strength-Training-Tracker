@@ -19,17 +19,16 @@
 - **`LogManager.tsx`**: Table-based view for viewing, filtering, and deleting past workout logs.
 - **`WorkoutHistory.tsx`**: Training Archive section displaying log history and stagnation criteria with Cyan 400 badge styling.
 - **`IntensityChart.tsx`**: Intensity Tracker section visualizing progression (Weight/RPE) across Heavy, Medium, and Light intensities in a 3-column grid layout (single column on mobile), with a desktop-only full-width expand toggle on each chart and single-point hover tooltips.
-- **`ProgressChart.tsx`**: Progress Tracker section visualizing progression (Weight/RPE) across all exercises in a 2-column grid layout (single column on mobile), with a desktop-only full-width expand toggle on each chart.
+- **`ProgressChart.tsx`**: Individual exercise progress tracker visualizing progression (Weight/RPE) per exercise across Heavy, Medium, and Light intensities, embedded directly into each exercise's entry card below the Log button in the Entry tab.
 - **`VolumeChart.tsx`**: Volume Tracker section visualizing total training volume over the last 60 days categorized by Heavy, Medium, and Light sessions, featuring session-by-session bar charts, weekly load aggregations, and cumulative volume curves.
 - **`RestTimerModal.tsx`**: Modal for rest countdown timer with sound notifications, backdrop click and ESC key dismiss support without cancelling saved logs.
-- **`workoutUtils.ts` & `workoutUtils.test.ts`**: Utilities for parsing Firestore dates safely (`parseWorkoutDate`), date comparison (`isSameDay`), deload calculation, exercise ordering, 60-day volume calculation, and unit tests.
+- **`workoutUtils.ts` & `workoutUtils.test.ts`**: Utilities for parsing Firestore dates safely (`parseWorkoutDate`), date comparison (`isSameDay`), deload detection and period calculation (`calculateShowDeloadBadge`, `getLastDeloadPeriod`, `formatDeloadPeriod`), exercise ordering, 60-day volume calculation, and unit tests.
 
 ## Progress Tab Layout Order
 In the Progress tab (`activeTab === 'progress'`), components are strictly ordered as:
 1. **`WorkoutHistory.tsx`** (Training Archive)
 2. **`IntensityChart.tsx`** (Intensity Tracker)
-3. **`ProgressChart.tsx`** (Progression Tracker)
-4. **`VolumeChart.tsx`** (Volume Tracker)
+3. **`VolumeChart.tsx`** (Volume Tracker)
 
 ## Styling & Layout Guidelines
 - **Tailwind CSS**: Exclusively use Tailwind utility classes for styling. Maintain the existing dark mode aesthetic (`bg-zinc-900`, `text-zinc-400`, `orange-500` accents, `cyan-400` stagnation highlights).

@@ -106,6 +106,100 @@ export function calculateShowDeloadBadge(workouts: Pick<Workout, 'date'>[], now:
   return maxConsecutiveBreakDays < 6;
 }
 
+export interface DeloadPeriod {
+  start: Date;
+  end: Date;
+  days: number;
+}
+
+/**
+ * Finds the most recent deload period (a consecutive break of 6 or more days)
+ * in workout history.
+ * 
+ * @param workouts List of completed workouts with their dates in milliseconds.
+ * @param now Reference "current" date (defaults to current system time).
+ */
+export function getLastDeloadPeriod(
+  workouts: Pick<Workout, 'date'>[],
+  now: Date = new Date()
+): DeloadPeriod | null {
+  if (!workouts || workouts.length === 0) return null;
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+  // Collect unique workout calendar days (normalized to local midnight)
+  const uniqueWorkoutDaysSet = new Set<number>();
+  workouts.forEach(w => {
+    if (w.date) {
+      const d = new Date(w.date);
+      d.setHours(0, 0, 0, 0);
+      uniqueWorkoutDaysSet.add(d.getTime());
+    }
+  });
+
+  const sortedWorkoutDays = Array.from(uniqueWorkoutDaysSet).sort((a, b) => a - b);
+  if (sortedWorkoutDays.length === 0) return null;
+
+  const latestWorkoutDay = sortedWorkoutDays[sortedWorkoutDays.length - 1];
+
+  // 1. Check if there is an ongoing break of 6+ days from the latest workout to today
+  const diffDaysFromLatest = Math.round((todayStart - latestWorkoutDay) / dayMs);
+  if (diffDaysFromLatest >= 6) {
+    const startRest = new Date(latestWorkoutDay + dayMs);
+    const endRest = new Date(todayStart);
+    const count = Math.round((endRest.getTime() - startRest.getTime()) / dayMs) + 1;
+    return {
+      start: startRest,
+      end: endRest,
+      days: count
+    };
+  }
+
+  // 2. Check gaps between consecutive workout days from most recent to earliest
+  for (let i = sortedWorkoutDays.length - 1; i > 0; i--) {
+    const prevWorkoutDay = sortedWorkoutDays[i - 1];
+    const currWorkoutDay = sortedWorkoutDays[i];
+    const gapDays = Math.round((currWorkoutDay - prevWorkoutDay) / dayMs);
+    const restDaysCount = gapDays - 1;
+
+    if (restDaysCount >= 6) {
+      const startRest = new Date(prevWorkoutDay + dayMs);
+      const endRest = new Date(currWorkoutDay - dayMs);
+      return {
+        start: startRest,
+        end: endRest,
+        days: restDaysCount
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Formats a deload period into a compact readable string, e.g. "Aug 2 – Aug 7".
+ */
+export function formatDeloadPeriod(period: DeloadPeriod): string {
+  const startStr = period.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const sameYear = period.start.getFullYear() === period.end.getFullYear();
+  const currentYear = new Date().getFullYear();
+
+  if (!sameYear) {
+    const startYearStr = period.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const endYearStr = period.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${startYearStr} – ${endYearStr}`;
+  }
+
+  if (period.start.getFullYear() !== currentYear) {
+    const endYearStr = period.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${startStr} – ${endYearStr}`;
+  }
+
+  const endStr = period.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `${startStr} – ${endStr}`;
+}
+
 /**
  * Checks if two dates represent the same local calendar day.
  */

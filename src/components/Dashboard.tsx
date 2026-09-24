@@ -9,14 +9,14 @@ import { doc, onSnapshot, setDoc, addDoc, collection, serverTimestamp, writeBatc
 import { UserPlan, Intensity, Workout, OperationType } from '../types';
 import { PlanEditor } from './PlanEditor';
 import { WorkoutHistory } from './WorkoutHistory';
-import { ProgressChart } from './ProgressChart';
 import { IntensityChart } from './IntensityChart';
 import { VolumeChart } from './VolumeChart';
+import { SingleExerciseChart } from './ProgressChart';
 import { LogManager } from './LogManager';
 import { RestTimerModal } from './RestTimerModal';
 import { FormVideoModal } from './FormVideoModal';
 import { Plus, Database, AlertCircle, FileJson, Download, Video } from 'lucide-react';
-import { calculateShowDeloadBadge, getOrderedExerciseNames, createExerciseOrderItems, parseWorkoutDate, isSameDay, isBWTarget } from '../lib/workoutUtils';
+import { calculateShowDeloadBadge, getLastDeloadPeriod, formatDeloadPeriod, getOrderedExerciseNames, createExerciseOrderItems, parseWorkoutDate, isSameDay, isBWTarget } from '../lib/workoutUtils';
 
 interface DashboardProps {
   onRegisterExport?: (exportFn: () => void) => void;
@@ -59,6 +59,10 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
 
   const showDeloadBadge = React.useMemo(() => {
     return calculateShowDeloadBadge(workouts);
+  }, [workouts]);
+
+  const lastDeloadPeriod = React.useMemo(() => {
+    return getLastDeloadPeriod(workouts);
   }, [workouts]);
 
   useEffect(() => {
@@ -294,12 +298,22 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
               <h2 className="text-2xl font-black text-white tracking-tight flex flex-wrap items-center gap-3">
                 <span className="w-2 h-8 bg-orange-500 rounded-full"></span>
                 <span>PLAN VS ACTUAL</span>
-                {showDeloadBadge && (
+                {showDeloadBadge ? (
                   <span className="px-3 py-1 bg-red-500/10 border border-red-500/30 text-red-500 text-[10px] font-black uppercase tracking-widest rounded-full animate-pulse flex items-center gap-1.5" title="You have not had a break of 6 or more consecutive days in the last 60 days">
                     <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
                     Deload Needed
                   </span>
-                )}
+                ) : lastDeloadPeriod ? (
+                  <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-1.5" title={`Last deload period: ${formatDeloadPeriod(lastDeloadPeriod)} (${lastDeloadPeriod.days} consecutive rest days)`}>
+                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
+                    Last Deload: {formatDeloadPeriod(lastDeloadPeriod)}
+                  </span>
+                ) : workouts.length > 0 ? (
+                  <span className="px-3 py-1 bg-zinc-800/80 border border-zinc-700/80 text-zinc-400 text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-1.5" title="Deload not needed yet (training duration is under 60 days without a required deload)">
+                    <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full"></span>
+                    Deload Not Needed
+                  </span>
+                ) : null}
               </h2>
               {lastLoggedDate && (
                 <div className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest pl-5 flex items-center gap-2">
@@ -375,7 +389,7 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
                 if (!target) return null;
                 return (
                   <PlanRow 
-                    key={`${intensity}-${exercise}`} 
+                    key={exercise} 
                     exercise={exercise} 
                     target={target} 
                     intensity={intensity} 
@@ -393,7 +407,6 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
         <div className="space-y-8 mt-4">
           <WorkoutHistory workouts={workouts} userPlan={userPlan} />
           <IntensityChart workouts={workouts} userPlan={userPlan} />
-          <ProgressChart workouts={workouts} userPlan={userPlan} />
           <VolumeChart workouts={workouts} userPlan={userPlan} />
         </div>
       )}
@@ -453,7 +466,7 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
   );
 }
 
-const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, userPlan: UserPlan, workouts: Workout[] }> = ({ exercise, target, intensity, userPlan, workouts }) => {
+const PlanRowComponent: React.FC<{ exercise: string, target: any, intensity: Intensity, userPlan: UserPlan, workouts: Workout[] }> = ({ exercise, target, intensity, userPlan, workouts }) => {
   const isTargetBW = isBWTarget(exercise, intensity, userPlan) || !!target?.isBW;
   const [actualWt, setActualWt] = useState<string | number>(() => {
     if (isTargetBW) return 0;
@@ -512,14 +525,18 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
       set2Reps(todayWorkout.set2 !== undefined && todayWorkout.set2 !== null && todayWorkout.set2 !== 0 ? todayWorkout.set2 : '');
       set3Reps(todayWorkout.set3 !== undefined && todayWorkout.set3 !== null && todayWorkout.set3 !== 0 ? todayWorkout.set3 : '');
       setRpe(todayWorkout.rpe || 'M');
+    } else {
+      if (!isTargetBW) {
+        setActualWt(target?.weight !== undefined ? target.weight : '');
+      } else {
+        setActualWt(0);
+      }
+      set1Reps('');
+      set2Reps('');
+      set3Reps('');
+      setRpe('M');
     }
-  }, [todayWorkout, isTargetBW]);
-
-  useEffect(() => {
-    if (!todayWorkout && !isTargetBW && target?.weight !== undefined && (actualWt === '' || actualWt === undefined)) {
-      setActualWt(target.weight);
-    }
-  }, [target?.weight, todayWorkout, isTargetBW]);
+  }, [intensity, todayWorkout, isTargetBW, target?.weight]);
 
   const expectedSets = target?.sets !== undefined ? Number(target.sets) : 3;
 
@@ -762,6 +779,16 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
         </div>
       </div>
 
+      {/* Individual Exercise Progress Chart below the Log button */}
+      <div className="w-full md:col-span-12 mt-2 pt-3 border-t border-zinc-900">
+        <SingleExerciseChart
+          exerciseName={exercise}
+          workouts={workouts}
+          userPlan={userPlan}
+          embedded={true}
+        />
+      </div>
+
       <RestTimerModal
         isOpen={showTimer}
         onClose={() => setShowTimer(false)}
@@ -781,4 +808,6 @@ const PlanRow: React.FC<{ exercise: string, target: any, intensity: Intensity, u
       )}
     </div>
   );
-}
+};
+
+const PlanRow = React.memo(PlanRowComponent);

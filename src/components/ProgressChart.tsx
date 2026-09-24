@@ -74,14 +74,27 @@ const CustomProgressTooltip = ({ active, payload, label, hoveredIntensity, mouse
   );
 };
 
-const SingleExerciseChart: React.FC<{
+const SingleExerciseChartComponent: React.FC<{
   exerciseName: string;
   workouts: Workout[];
   userPlan?: any;
   isInactive?: boolean;
-  isExpanded: boolean;
-  onToggleExpand: () => void;
-}> = ({ exerciseName, workouts, userPlan, isInactive = false, isExpanded, onToggleExpand }) => {
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
+  embedded?: boolean;
+}> = ({ 
+  exerciseName, 
+  workouts, 
+  userPlan, 
+  isInactive = false, 
+  isExpanded: controlledExpanded, 
+  onToggleExpand: controlledToggleExpand,
+  embedded = false,
+}) => {
+  const [internalExpanded, setInternalExpanded] = useState<boolean>(false);
+  const isExpanded = controlledExpanded !== undefined ? controlledExpanded : internalExpanded;
+  const onToggleExpand = controlledToggleExpand || (() => setInternalExpanded(prev => !prev));
+
   const [hoveredIntensity, setHoveredIntensity] = useState<string | null>(null);
   const [mouseYRatio, setMouseYRatio] = useState<number>(0.5);
 
@@ -169,18 +182,33 @@ const SingleExerciseChart: React.FC<{
 
   const isArchivedOrInactive = isInactive || !!userPlan?.exerciseMetadata?.[exerciseName]?.isInactive;
 
+  const chartHeightClass = embedded
+    ? (isExpanded ? 'h-[320px]' : 'h-[200px]')
+    : (isExpanded ? 'h-[360px]' : 'h-[260px]');
+
   return (
-    <div className={`border rounded-2xl p-4 sm:p-6 flex flex-col justify-between shadow-lg transition-all duration-300 ${
-      isArchivedOrInactive ? 'bg-zinc-950/40 border-zinc-800/60' : 'bg-zinc-950/60 border-zinc-800/80'
-    } ${
-      isExpanded ? 'lg:col-span-2 border-orange-500/40 ring-1 ring-orange-500/20' : 'lg:col-span-1'
+    <div className={`transition-all duration-300 ${
+      embedded 
+        ? 'bg-zinc-900/40 border border-zinc-800/60 rounded-xl p-3 sm:p-4 flex flex-col justify-between shadow-inner w-full'
+        : `border rounded-2xl p-4 sm:p-6 flex flex-col justify-between shadow-lg ${
+            isArchivedOrInactive ? 'bg-zinc-950/40 border-zinc-800/60' : 'bg-zinc-950/60 border-zinc-800/80'
+          } ${
+            isExpanded ? 'lg:col-span-2 border-orange-500/40 ring-1 ring-orange-500/20' : 'lg:col-span-1'
+          }`
     }`}>
-      <div className="flex items-center justify-between mb-4 gap-2">
+      <div className="flex items-center justify-between mb-3 gap-2">
         <div className="flex items-center gap-2">
-          <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${isArchivedOrInactive ? 'bg-amber-500' : 'bg-orange-500'}`}></span>
-            {exerciseName}
-          </h3>
+          {embedded ? (
+            <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-300 tracking-tight">
+              <TrendingUp className="w-3.5 h-3.5 text-orange-500" />
+              <span>Progression Chart</span>
+            </div>
+          ) : (
+            <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${isArchivedOrInactive ? 'bg-amber-500' : 'bg-orange-500'}`}></span>
+              {exerciseName}
+            </h3>
+          )}
           {isArchivedOrInactive && (
             <span className="text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">
               Inactive
@@ -195,25 +223,27 @@ const SingleExerciseChart: React.FC<{
 
         <button
           onClick={onToggleExpand}
-          className="hidden lg:flex p-1.5 text-zinc-400 hover:text-white bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 rounded-lg transition-colors items-center gap-1.5 text-xs font-mono font-medium"
-          title={isExpanded ? "Collapse to grid" : "Expand to full width"}
+          className={`p-1.5 text-zinc-400 hover:text-white bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-mono font-medium ${
+            embedded ? '' : 'hidden lg:flex'
+          }`}
+          title={isExpanded ? (embedded ? "Collapse chart height" : "Collapse to grid") : (embedded ? "Expand chart height" : "Expand to full width")}
         >
           {isExpanded ? (
             <>
               <Minimize2 className="w-3.5 h-3.5 text-orange-400" />
-              <span>Collapse</span>
+              <span>{embedded ? 'Collapse' : 'Collapse'}</span>
             </>
           ) : (
             <>
               <Maximize2 className="w-3.5 h-3.5" />
-              <span>Full Width</span>
+              <span>{embedded ? 'Expand' : 'Full Width'}</span>
             </>
           )}
         </button>
       </div>
 
       <div 
-        className={`${isExpanded ? 'h-[360px]' : 'h-[260px]'} w-full transition-all duration-300`}
+        className={`${chartHeightClass} w-full transition-all duration-300`}
         onMouseMove={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
           if (rect.height > 0) {
@@ -244,7 +274,7 @@ const SingleExerciseChart: React.FC<{
                 fontSize={10} 
                 tickMargin={8} 
                 axisLine={false} 
-                tickLine={false}
+                tickLine={false} 
                 domain={['auto', 'auto']}
               />
               <Tooltip 
@@ -260,6 +290,7 @@ const SingleExerciseChart: React.FC<{
                   stroke="#ef4444" 
                   strokeWidth={2.5}
                   connectNulls
+                  isAnimationActive={false}
                   dot={<CustomDot />}
                   activeDot={{ 
                     r: 5, 
@@ -278,6 +309,7 @@ const SingleExerciseChart: React.FC<{
                   stroke="#3b82f6" 
                   strokeWidth={2.5}
                   connectNulls
+                  isAnimationActive={false}
                   dot={<CustomDot />}
                   activeDot={{ 
                     r: 5, 
@@ -296,6 +328,7 @@ const SingleExerciseChart: React.FC<{
                   stroke="#f97316" 
                   strokeWidth={2.5}
                   connectNulls
+                  isAnimationActive={false}
                   dot={<CustomDot />}
                   activeDot={{ 
                     r: 5, 
@@ -310,7 +343,7 @@ const SingleExerciseChart: React.FC<{
             </LineChart>
           </ResponsiveContainer>
         ) : (
-          <div className="h-full flex items-center justify-center text-zinc-600 font-mono text-xs uppercase tracking-widest">
+          <div className="h-full flex items-center justify-center text-zinc-600 font-mono text-xs uppercase tracking-widest bg-zinc-950/20 rounded-lg border border-zinc-900/60">
             No data logged yet
           </div>
         )}
@@ -318,6 +351,8 @@ const SingleExerciseChart: React.FC<{
     </div>
   );
 };
+
+export const SingleExerciseChart = React.memo(SingleExerciseChartComponent);
 
 export function ProgressChart({ workouts, userPlan }: { workouts: Workout[], userPlan?: any }) {
   const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
