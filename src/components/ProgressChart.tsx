@@ -49,6 +49,7 @@ const CustomProgressTooltip = ({ active, payload, label, hoveredIntensity, mouse
   const ga = selectedItem.payload?.[`${intensity}_ga`];
   const isBW = selectedItem.payload?.[`${intensity}_isBW`];
   const reps = selectedItem.payload?.[`${intensity}_reps`];
+  const sets = selectedItem.payload?.[`${intensity}_sets`];
 
   let weightColorClass = 'text-orange-400';
   if (rpe === 'E') weightColorClass = 'text-green-500';
@@ -69,6 +70,18 @@ const CustomProgressTooltip = ({ active, payload, label, hoveredIntensity, mouse
         </div>
       ) : (
         <div className={`text-xs font-mono font-bold ${weightColorClass}`}>{weight} lbs</div>
+      )}
+      {reps !== undefined && reps !== null && (
+        <div className="text-xs font-mono text-zinc-400">
+          {sets && sets !== String(reps) ? (
+            <>
+              <span className="text-zinc-300 font-semibold">{sets}</span>{' '}
+              <span className="text-zinc-500 text-[10px]">({reps} reps)</span>
+            </>
+          ) : (
+            <span className="text-zinc-300 font-semibold">{reps} reps</span>
+          )}
+        </div>
       )}
     </div>
   );
@@ -123,12 +136,21 @@ const SingleExerciseChartComponent: React.FC<{
       const totalReps = getWorkoutTotalReps(w);
       const plotVal = getWorkoutPlotValue(w, userPlan);
 
+      const setsArr: (number | string)[] = [];
+      if (w.set1 !== undefined && w.set1 !== null && w.set1 !== '') setsArr.push(w.set1);
+      if (w.set2 !== undefined && w.set2 !== null && w.set2 !== '') setsArr.push(w.set2);
+      const planSets = userPlan?.[w.intensity]?.[w.exerciseName]?.sets ?? w.targetSets;
+      if (w.set3 !== undefined && w.set3 !== null && w.set3 !== '' && (Number(w.set3) > 0 || Number(planSets) >= 3)) {
+        setsArr.push(w.set3);
+      }
+
       const entry = dataByDate.get(dateStr);
       entry[w.intensity] = plotVal;
       entry[`${w.intensity}_rpe`] = w.rpe;
       entry[`${w.intensity}_ga`] = isGoalAchieved(w, userPlan);
       entry[`${w.intensity}_isBW`] = isBw;
       entry[`${w.intensity}_reps`] = totalReps;
+      entry[`${w.intensity}_sets`] = setsArr.join(' / ');
     });
 
     return Array.from(dataByDate.values()).sort((a, b) => a.timestamp - b.timestamp);
