@@ -137,11 +137,22 @@ const SingleExerciseChartComponent: React.FC<{
       const plotVal = getWorkoutPlotValue(w, userPlan);
 
       const setsArr: (number | string)[] = [];
-      if (w.set1 !== undefined && w.set1 !== null && w.set1 !== '') setsArr.push(w.set1);
-      if (w.set2 !== undefined && w.set2 !== null && w.set2 !== '') setsArr.push(w.set2);
-      const planSets = userPlan?.[w.intensity]?.[w.exerciseName]?.sets ?? w.targetSets;
-      if (w.set3 !== undefined && w.set3 !== null && w.set3 !== '' && (Number(w.set3) > 0 || Number(planSets) >= 3)) {
-        setsArr.push(w.set3);
+      const planSets = Number(userPlan?.[w.intensity]?.[w.exerciseName]?.sets ?? w.targetSets) || 2;
+      for (let i = 1; ; i++) {
+        const val = w[`set${i}`];
+        if (val !== undefined && val !== null && val !== '') {
+          if (Number(val) > 0 || i <= planSets) {
+            setsArr.push(val);
+          }
+        } else if (i <= planSets) {
+          continue;
+        } else {
+          const hasHigher = Object.keys(w).some(k => {
+            const match = k.match(/^set(\d+)$/);
+            return match && Number(match[1]) > i && w[k] !== undefined && w[k] !== null && w[k] !== '';
+          });
+          if (!hasHigher) break;
+        }
       }
 
       const entry = dataByDate.get(dateStr);

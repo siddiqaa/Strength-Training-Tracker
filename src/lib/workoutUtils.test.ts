@@ -828,6 +828,49 @@ describe('isGoalAchieved', () => {
     };
     expect(isGoalAchieved(incompleteWorkout, plan)).toBe(false);
   });
+
+  it('should support 4 sets in a plan and evaluate goal achieved accurately', () => {
+    const plan4Sets: UserPlan = {
+      userId: 'u1',
+      Heavy: {
+        'Squat': { weight: 225, sets: 4, reps: '8' },
+      },
+      Light: {},
+      Medium: {}
+    };
+
+    const workoutIncomplete: Workout = {
+      userId: 'u1',
+      exerciseName: 'Squat',
+      intensity: 'Heavy',
+      weight: 225,
+      set1: 8,
+      set2: 8,
+      set3: 8,
+      set4: 6,
+      targetSets: 4,
+      targetReps: '8',
+      date: Date.now()
+    };
+    expect(isGoalAchieved(workoutIncomplete, plan4Sets)).toBe(false);
+    expect(getWorkoutTotalReps(workoutIncomplete)).toBe(30);
+
+    const workoutComplete: Workout = {
+      userId: 'u1',
+      exerciseName: 'Squat',
+      intensity: 'Heavy',
+      weight: 225,
+      set1: 8,
+      set2: 8,
+      set3: 8,
+      set4: 8,
+      targetSets: 4,
+      targetReps: '8',
+      date: Date.now()
+    };
+    expect(isGoalAchieved(workoutComplete, plan4Sets)).toBe(true);
+    expect(getWorkoutTotalReps(workoutComplete)).toBe(32);
+  });
 });
 
 

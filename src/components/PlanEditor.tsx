@@ -275,12 +275,26 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
     doc.text('Exercise Plan', 14, 32);
 
     const planRows = activeExercises.map(ex => {
+      const meta = editedPlan.exerciseMetadata?.[ex];
+      const isBarbell = meta?.equipment === 'barbell' || (!meta?.equipment && ex.toLowerCase().includes('barbell'));
+      const isDumbbell = meta?.equipment === '2 dumbbell' || (!meta?.equipment && (ex.toLowerCase().includes('dumbbell') || /\bdb\b/i.test(ex)) && !ex.toLowerCase().includes('1 dumbbell'));
+
       const formatCell = (day: PlannedSet | undefined) => {
         if (!day) return '-';
-        return `${day.sets}x${day.reps} @ ${day.isBW ? 'BW' : day.weight}`;
+        const base = `${day.sets}x${day.reps} @ ${day.isBW ? 'BW' : day.weight}`;
+        if (!day.isBW && day.weight !== undefined && day.weight !== null) {
+          if (isBarbell) {
+            const totalWeight = calculateEffectiveWeight(day.weight, 'barbell', false);
+            return `${base}\nTotal: ${totalWeight} lbs`;
+          }
+          if (isDumbbell && Number(day.weight) > 0) {
+            const totalWeight = calculateEffectiveWeight(day.weight, '2 dumbbell', false);
+            return `${base}\nTotal: ${totalWeight} lbs`;
+          }
+        }
+        return base;
       };
       
-      const meta = editedPlan.exerciseMetadata?.[ex];
       const metadataStr = meta?.pushPull || meta?.muscleGroup ? `\n[${meta.pushPull || ''} ${meta.muscleGroup || ''}]`.trim() : '';
 
       return [

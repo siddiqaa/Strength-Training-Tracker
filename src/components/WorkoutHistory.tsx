@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { db, auth, handleFirestoreError } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { Workout, OperationType } from '../types';
-import { getOrderedExerciseNames, isSameDay } from '../lib/workoutUtils';
+import { getOrderedExerciseNames, isSameDay, getWorkoutTotalReps } from '../lib/workoutUtils';
 import { History, Calendar } from 'lucide-react';
 
 export function WorkoutHistory({ workouts, userPlan }: { workouts: Workout[], userPlan?: any }) {
@@ -29,30 +29,44 @@ export function WorkoutHistory({ workouts, userPlan }: { workouts: Workout[], us
     );
   }
 
-  // Combine exercises from history and from the current plan, keeping the plan's custom order
-  let planExercisesList: string[] = [];
+  // Helper to check if an exercise is inactive (case-insensitive and trimmed)
+  const isExerciseInactive = (name: string): boolean => {
+    if (!userPlan?.exerciseMetadata) return false;
+    if (userPlan.exerciseMetadata[name]?.isInactive) return true;
+    const normalized = name.trim().toLowerCase();
+    for (const [key, meta] of Object.entries(userPlan.exerciseMetadata as Record<string, any>)) {
+      if (key.trim().toLowerCase() === normalized && meta?.isInactive) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Only show active exercises from the current plan, keeping the plan's custom order
+  let exercises: string[] = [];
   if (userPlan) {
     const allActive = new Set<string>();
     (['Heavy', 'Light', 'Medium'] as const).forEach(int => {
       Object.keys(userPlan[int] || {}).forEach(ex => {
-        if (!userPlan.exerciseMetadata?.[ex]?.isInactive) {
+        if (!isExerciseInactive(ex)) {
           allActive.add(ex);
         }
       });
     });
-    planExercisesList = getOrderedExerciseNames(
+
+    if (userPlan.exerciseMetadata) {
+      Object.keys(userPlan.exerciseMetadata).forEach(ex => {
+        if (isExerciseInactive(ex)) {
+          allActive.delete(ex);
+        }
+      });
+    }
+
+    exercises = getOrderedExerciseNames(
       userPlan.exerciseOrder,
       Array.from(allActive)
-    );
+    ).filter(ex => allActive.has(ex));
   }
-  
-  const planExercisesSet = new Set(planExercisesList);
-  const historyExercises = workouts.map(w => w.exerciseName);
-  const historyOnlyExercises = Array.from(new Set(historyExercises))
-    .filter(ex => !planExercisesSet.has(ex) && !userPlan?.exerciseMetadata?.[ex]?.isInactive)
-    .sort();
-
-  const exercises = [...planExercisesList, ...historyOnlyExercises];
 
   return (
     <div className="space-y-6 mt-8">
@@ -176,8 +190,8 @@ function TableCell({ workout, history, threshold }: { workout?: Workout, history
     const weightSameOrLess = Number(w.weight) <= Number(prev.weight);
     
     // Calculate total reps for comparison within same intensity
-    const wTotal = (Number(w.set1) || 0) + (Number(w.set2) || 0) + (Number(w.set3) || 0);
-    const pTotal = (Number(prev.set1) || 0) + (Number(prev.set2) || 0) + (Number(prev.set3) || 0);
+    const wTotal = getWorkoutTotalReps(w);
+    const pTotal = getWorkoutTotalReps(prev);
     
     // Reps must be same or less than previous session of the SAME intensity
     const repsSameOrLess = wTotal <= pTotal;
@@ -191,6 +205,21 @@ function TableCell({ workout, history, threshold }: { workout?: Workout, history
   else if (workout.rpe === 'M') weightColor = 'text-yellow-500';
   else if (workout.rpe === 'H') weightColor = 'text-red-500';
 
+  const setsList: (number | string)[] = [];
+  for (let i = 1; ; i++) {
+    const val = workout[`set${i}`];
+    if (val !== undefined && val !== null && val !== '') {
+      setsList.push(val);
+    } else {
+      const hasHigher = Object.keys(workout).some(k => {
+        const match = k.match(/^set(\d+)$/);
+        return match && Number(match[1]) > i && workout[k] !== undefined && workout[k] !== null && workout[k] !== '';
+      });
+      if (!hasHigher) break;
+      setsList.push(0);
+    }
+  }
+
   return (
     <div className="flex flex-col items-center justify-center gap-0 py-1.5 px-0 sm:px-1 text-[10px] sm:text-xs font-mono whitespace-nowrap">
       <div className="flex items-center gap-1 sm:gap-1.5">
@@ -199,7 +228,7 @@ function TableCell({ workout, history, threshold }: { workout?: Workout, history
         </span>
         <span className="text-zinc-700 font-black">|</span>
         <span className="text-zinc-400 font-medium">
-          {workout.set1} {workout.set2}{workout.set3 !== undefined && workout.set3 !== null ? ` ${workout.set3}` : ''}
+          {setsList.join(' ')}
         </span>
       </div>
     </div>

@@ -54,11 +54,11 @@ export function LogManager({ workouts }: LogManagerProps) {
       const { id: _, userId: __, ...updateValues } = editData;
 
       if (updateValues.weight !== undefined) updateValues.weight = Number(updateValues.weight);
-      if (updateValues.set1 !== undefined) updateValues.set1 = Number(updateValues.set1);
-      if (updateValues.set2 !== undefined) updateValues.set2 = Number(updateValues.set2);
-      if (updateValues.set3 !== undefined && updateValues.set3 !== null) {
-        updateValues.set3 = Number(updateValues.set3);
-      }
+      Object.keys(updateValues).forEach(k => {
+        if (/^set\d+$/.test(k) && updateValues[k] !== undefined && updateValues[k] !== null) {
+          updateValues[k] = Number(updateValues[k]);
+        }
+      });
 
       if (editDateString) {
         const parts = editDateString.split('-').map(Number);
@@ -192,39 +192,57 @@ export function LogManager({ workouts }: LogManagerProps) {
                     <td className="p-2 sm:p-4 text-center">
                       {isEditing ? (
                         <div className="flex items-center justify-center gap-1">
-                          <input
-                            type="number"
-                            value={editData.set1 || 0}
-                            onChange={(e) => setEditData({ ...editData, set1: Number(e.target.value) })}
-                            className="w-10 bg-zinc-900 border border-zinc-700 rounded px-1 py-1 text-center text-xs text-white"
-                            title="Set 1"
-                          />
-                          <input
-                            type="number"
-                            value={editData.set2 || 0}
-                            onChange={(e) => setEditData({ ...editData, set2: Number(e.target.value) })}
-                            className="w-10 bg-zinc-900 border border-zinc-700 rounded px-1 py-1 text-center text-xs text-white"
-                            title="Set 2"
-                          />
-                          <input
-                            type="number"
-                            value={editData.set3 || 0}
-                            onChange={(e) => setEditData({ ...editData, set3: Number(e.target.value) })}
-                            className="w-10 bg-zinc-900 border border-zinc-700 rounded px-1 py-1 text-center text-xs text-white"
-                            title="Set 3"
-                          />
+                          {(() => {
+                            const setKeys: string[] = [];
+                            for (let i = 1; ; i++) {
+                              const k = `set${i}`;
+                              if (editData[k] !== undefined && editData[k] !== null) {
+                                setKeys.push(k);
+                              } else {
+                                const hasHigher = Object.keys(editData).some(key => {
+                                  const match = key.match(/^set(\d+)$/);
+                                  return match && Number(match[1]) > i && editData[key] !== undefined;
+                                });
+                                if (!hasHigher) break;
+                                setKeys.push(k);
+                              }
+                            }
+                            if (setKeys.length === 0) setKeys.push('set1', 'set2');
+                            return setKeys.map((key, idx) => (
+                              <input
+                                key={key}
+                                type="number"
+                                value={editData[key] || 0}
+                                onChange={(e) => setEditData({ ...editData, [key]: Number(e.target.value) })}
+                                className="w-10 bg-zinc-900 border border-zinc-700 rounded px-1 py-1 text-center text-xs text-white"
+                                title={`Set ${idx + 1}`}
+                              />
+                            ));
+                          })()}
                         </div>
                       ) : (
                         <div className="flex items-center justify-center gap-1 text-[10px] sm:text-sm font-mono text-white">
-                          <span>{workout.set1}</span>
-                          <span className="text-zinc-600">/</span>
-                          <span>{workout.set2}</span>
-                          {workout.set3 !== undefined && (
-                            <>
-                              <span className="text-zinc-600">/</span>
-                              <span>{workout.set3}</span>
-                            </>
-                          )}
+                          {(() => {
+                            const setVals: (number | string)[] = [];
+                            for (let i = 1; ; i++) {
+                              const val = workout[`set${i}`];
+                              if (val !== undefined && val !== null && val !== '') {
+                                setVals.push(val);
+                              } else {
+                                const hasHigher = Object.keys(workout).some(k => {
+                                  const match = k.match(/^set(\d+)$/);
+                                  return match && Number(match[1]) > i && workout[k] !== undefined && workout[k] !== null && workout[k] !== '';
+                                });
+                                if (!hasHigher) break;
+                              }
+                            }
+                            return setVals.map((v, idx) => (
+                              <React.Fragment key={idx}>
+                                {idx > 0 && <span className="text-zinc-600">/</span>}
+                                <span>{v}</span>
+                              </React.Fragment>
+                            ));
+                          })()}
                         </div>
                       )}
                     </td>

@@ -35,12 +35,20 @@ service cloud.firestore {
         && data.set1 is number && data.set1 >= 0
         && data.set2 is number && data.set2 >= 0
         && (!('set3' in data) || data.set3 == null || (data.set3 is number && data.set3 >= 0))
+        && (!('set4' in data) || data.set4 == null || (data.set4 is number && data.set4 >= 0))
+        && (!('set5' in data) || data.set5 == null || (data.set5 is number && data.set5 >= 0))
+        && (!('set6' in data) || data.set6 == null || (data.set6 is number && data.set6 >= 0))
+        && (!('set7' in data) || data.set7 == null || (data.set7 is number && data.set7 >= 0))
+        && (!('set8' in data) || data.set8 == null || (data.set8 is number && data.set8 >= 0))
+        && (!('set9' in data) || data.set9 == null || (data.set9 is number && data.set9 >= 0))
+        && (!('set10' in data) || data.set10 == null || (data.set10 is number && data.set10 >= 0))
         && data.intensity in ['Heavy', 'Light', 'Medium']
         && (!('notes' in data) || data.notes == null || (data.notes is string && data.notes.size() <= 500))
         && (!('targetWeight' in data) || data.targetWeight == null || data.targetWeight is number)
         && (!('targetReps' in data) || data.targetReps == null || data.targetReps is string || data.targetReps is number)
         && (!('targetSets' in data) || data.targetSets == null || data.targetSets is number)
         && (!('rpe' in data) || data.rpe == null || data.rpe in ['E', 'M', 'H'])
+        && (!('isBW' in data) || data.isBW == null || data.isBW is bool)
         && (data.date is timestamp || data.date is number);
     }
 
@@ -48,14 +56,14 @@ service cloud.firestore {
       allow create: if isSignedIn() 
         && isValidWorkout(incoming())
         && incoming().keys().hasAll(['userId', 'exerciseName', 'weight', 'set1', 'set2', 'intensity', 'date'])
-        && incoming().keys().size() <= 15; // Including optional set3, notes, targets, rpe
+        && incoming().keys().size() <= 25; // Including optional sets, notes, targets, rpe, isBW
 
       allow read: if isOwner(resource.data.userId);
 
       allow update: if isOwner(resource.data.userId)
         && isValidWorkout(incoming())
         && incoming().userId == resource.data.userId // Immutable userId
-        && incoming().diff(resource.data).affectedKeys().hasOnly(['exerciseName', 'weight', 'set1', 'set2', 'set3', 'intensity', 'notes', 'targetWeight', 'targetReps', 'targetSets', 'date', 'rpe']);
+        && incoming().diff(resource.data).affectedKeys().hasOnly(['exerciseName', 'weight', 'set1', 'set2', 'set3', 'set4', 'set5', 'set6', 'set7', 'set8', 'set9', 'set10', 'intensity', 'notes', 'targetWeight', 'targetReps', 'targetSets', 'date', 'rpe', 'isBW']);
 
       allow delete: if isOwner(resource.data.userId);
     }

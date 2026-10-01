@@ -286,10 +286,16 @@ export function isGoalAchieved(workout: Workout, userPlan?: UserPlan): boolean {
     ? Number(planTarget.sets)
     : (workout.targetSets && Number(workout.targetSets) > 0 ? Number(workout.targetSets) : 0);
 
-  // If set3 was logged with actual reps (> 0), at least 3 sets were performed in this session,
-  // so set 3 must be evaluated.
-  const hasSet3 = workout.set3 !== undefined && workout.set3 !== null && Number(workout.set3) > 0;
-  const targetSets = hasSet3 ? Math.max(explicitTargetSets, 3) : explicitTargetSets;
+  // If any set was logged with actual reps (> 0), at least those sets were performed in this session.
+  let highestLoggedSet = 0;
+  Object.keys(workout).forEach(k => {
+    const match = k.match(/^set(\d+)$/);
+    if (match && Number(workout[k]) > 0) {
+      highestLoggedSet = Math.max(highestLoggedSet, Number(match[1]));
+    }
+  });
+
+  const targetSets = highestLoggedSet > 0 ? Math.max(explicitTargetSets, highestLoggedSet) : explicitTargetSets;
 
   if (targetSets <= 0) {
     return false;
@@ -308,13 +314,9 @@ export function isGoalAchieved(workout: Workout, userPlan?: UserPlan): boolean {
   }
 
   // 4. Evaluate all target sets
-  const set1 = Number(workout.set1) || 0;
-  const set2 = Number(workout.set2) || 0;
-  const set3 = Number(workout.set3) || 0;
-  const sets = [set1, set2, set3];
-
-  for (let i = 0; i < targetSets; i++) {
-    if ((sets[i] || 0) < targetRepsValue) {
+  for (let i = 1; i <= targetSets; i++) {
+    const setReps = Number(workout[`set${i}`]) || 0;
+    if (setReps < targetRepsValue) {
       return false;
     }
   }
@@ -346,7 +348,20 @@ export function isBWTarget(
  * Gets the total reps logged for a workout entry across completed sets.
  */
 export function getWorkoutTotalReps(workout: Workout): number {
-  return (Number(workout.set1) || 0) + (Number(workout.set2) || 0) + (Number(workout.set3) || 0);
+  let total = 0;
+  for (let i = 1; ; i++) {
+    const key = `set${i}`;
+    if (key in workout && workout[key] !== undefined && workout[key] !== null) {
+      total += Number(workout[key]) || 0;
+    } else {
+      const hasHigher = Object.keys(workout).some(k => {
+        const match = k.match(/^set(\d+)$/);
+        return match && Number(match[1]) > i && workout[k] !== undefined && workout[k] !== null && workout[k] !== '';
+      });
+      if (!hasHigher) break;
+    }
+  }
+  return total;
 }
 
 /**

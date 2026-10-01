@@ -194,13 +194,10 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
             const randomRpe = rpeOptions[Math.floor(Math.random() * rpeOptions.length)];
 
             const docRef = doc(collection(db, 'workouts'));
-            batch.set(docRef, {
+            const workoutSeed: any = {
               userId,
               exerciseName: exercise,
               weight: isTargetBW ? 0 : Math.max(0, baseWeight + weightDiff),
-              set1: targetReps,
-              set2: targetReps,
-              ...(expectedSets >= 3 ? { set3: targetReps } : {}),
               intensity: int,
               targetWeight: isTargetBW ? 0 : (target.weight !== undefined ? target.weight : baseWeight),
               targetReps: target.reps || '8',
@@ -208,7 +205,12 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
               rpe: randomRpe,
               date: Timestamp.fromDate(date),
               isBW: isTargetBW,
-            });
+            };
+            const count = Math.max(expectedSets, 2);
+            for (let s = 1; s <= count; s++) {
+              workoutSeed[`set${s}`] = targetReps;
+            }
+            batch.set(docRef, workoutSeed);
           }
         }
       }
@@ -472,9 +474,8 @@ const PlanRowComponent: React.FC<{ exercise: string, target: any, intensity: Int
     if (isTargetBW) return 0;
     return target?.weight !== undefined ? target.weight : '';
   });
-  const [set1, set1Reps] = useState<string | number>('');
-  const [set2, set2Reps] = useState<string | number>('');
-  const [set3, set3Reps] = useState<string | number>('');
+  const expectedSets = target?.sets !== undefined ? Number(target.sets) : 3;
+  const [setsReps, setSetsReps] = useState<(string | number)[]>([]);
   const [rpe, setRpe] = useState<'E' | 'M' | 'H'>('M');
   const [isLogging, setIsLogging] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
@@ -515,15 +516,27 @@ const PlanRowComponent: React.FC<{ exercise: string, target: any, intensity: Int
   }, [userPlan, exercise]);
 
   useEffect(() => {
+    const numSets = Math.max(expectedSets, 1);
     if (todayWorkout) {
       if (!isTargetBW) {
         setActualWt(todayWorkout.weight !== undefined && todayWorkout.weight !== null ? todayWorkout.weight : (target?.weight ?? ''));
       } else {
         setActualWt(0);
       }
-      set1Reps(todayWorkout.set1 !== undefined && todayWorkout.set1 !== null && todayWorkout.set1 !== 0 ? todayWorkout.set1 : '');
-      set2Reps(todayWorkout.set2 !== undefined && todayWorkout.set2 !== null && todayWorkout.set2 !== 0 ? todayWorkout.set2 : '');
-      set3Reps(todayWorkout.set3 !== undefined && todayWorkout.set3 !== null && todayWorkout.set3 !== 0 ? todayWorkout.set3 : '');
+      const loaded: (string | number)[] = [];
+      for (let i = 1; i <= numSets; i++) {
+        const val = todayWorkout[`set${i}`];
+        loaded.push(val !== undefined && val !== null && val !== 0 ? val : '');
+      }
+      for (let i = numSets + 1; ; i++) {
+        const val = todayWorkout[`set${i}`];
+        if (val !== undefined && val !== null && val !== 0) {
+          loaded.push(val);
+        } else {
+          break;
+        }
+      }
+      setSetsReps(loaded);
       setRpe(todayWorkout.rpe || 'M');
     } else {
       if (!isTargetBW) {
@@ -531,32 +544,23 @@ const PlanRowComponent: React.FC<{ exercise: string, target: any, intensity: Int
       } else {
         setActualWt(0);
       }
-      set1Reps('');
-      set2Reps('');
-      set3Reps('');
+      setSetsReps(Array(numSets).fill(''));
       setRpe('M');
     }
-  }, [intensity, todayWorkout, isTargetBW, target?.weight]);
-
-  const expectedSets = target?.sets !== undefined ? Number(target.sets) : 3;
+  }, [intensity, todayWorkout, isTargetBW, target?.weight, expectedSets]);
 
   const handleLog = async () => {
     if (!auth.currentUser) return;
     setIsLogging(true);
     try {
       const parsedWeight = isTargetBW ? 0 : (typeof actualWt === 'number' ? actualWt : (actualWt === '' ? 0 : Number(actualWt)));
-      const s1 = set1 !== '' ? Number(set1) : 0;
-      const s2 = set2 !== '' ? Number(set2) : 0;
-      const s3 = set3 !== '' ? Number(set3) : 0;
       const safeWeight = isNaN(parsedWeight) ? 0 : parsedWeight;
 
-      const workoutData = {
+      const numSetsToSave = Math.max(expectedSets, setsReps.length, 2);
+      const workoutData: any = {
         userId: auth.currentUser.uid,
         exerciseName: exercise,
         weight: safeWeight,
-        set1: isNaN(s1) ? 0 : s1,
-        set2: isNaN(s2) ? 0 : s2,
-        ...(expectedSets >= 3 ? { set3: isNaN(s3) ? 0 : s3 } : {}),
         intensity,
         targetWeight: isTargetBW ? 0 : (target?.weight !== undefined ? Number(target.weight) : safeWeight),
         targetReps: target?.reps !== undefined ? String(target.reps) : '',
@@ -565,6 +569,16 @@ const PlanRowComponent: React.FC<{ exercise: string, target: any, intensity: Int
         date: serverTimestamp(),
         isBW: isTargetBW,
       };
+
+      for (let i = 0; i < numSetsToSave; i++) {
+        const setNum = i + 1;
+        const raw = setsReps[i];
+        const num = raw !== '' && raw !== undefined && raw !== null ? Number(raw) : 0;
+        const safeReps = isNaN(num) ? 0 : num;
+        if (setNum <= 2 || setNum <= expectedSets || safeReps > 0) {
+          workoutData[`set${setNum}`] = safeReps;
+        }
+      }
 
       if (todayWorkout?.id) {
         await setDoc(doc(db, 'workouts', todayWorkout.id), workoutData);
@@ -709,7 +723,7 @@ const PlanRowComponent: React.FC<{ exercise: string, target: any, intensity: Int
             )}
           </div>
           {!isTargetBW && equipment && (equipment === 'barbell' || equipment === '2 dumbbell') && (
-            <span className="text-[9px] text-zinc-500 font-mono mt-0.5" title={equipment === 'barbell' ? 'Effective: Plate wt x 2 + 45 lb bar' : 'Effective: Dumbbell wt x 2'}>
+            <span className="text-xs text-zinc-400 font-mono font-medium mt-0.5" title={equipment === 'barbell' ? 'Effective: Plate wt x 2 + 45 lb bar' : 'Effective: Dumbbell wt x 2'}>
               {equipment === 'barbell' ? `eff: ${(Number(target.weight || 0) * 2) + 45} lb` : `eff: ${Number(target.weight || 0) * 2} lb`}
             </span>
           )}
@@ -728,12 +742,29 @@ const PlanRowComponent: React.FC<{ exercise: string, target: any, intensity: Int
         <span className="text-zinc-600 font-black px-1 hidden md:flex items-center">|</span>
         
         <div className="flex items-center gap-1.5 md:gap-2">
-          <div className="flex gap-1.5 md:gap-1">
-            <input type="number" value={set1} onChange={e => set1Reps(e.target.value === '' ? '' : Number(e.target.value))} className="w-12 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 1 Reps" />
-            <input type="number" value={set2} onChange={e => set2Reps(e.target.value === '' ? '' : Number(e.target.value))} className="w-12 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 2 Reps" />
-            {expectedSets >= 3 && (
-              <input type="number" value={set3} onChange={e => set3Reps(e.target.value === '' ? '' : Number(e.target.value))} className="w-12 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm" title="Set 3 Reps" />
-            )}
+          <div className="flex flex-wrap gap-1.5 md:gap-1">
+            {Array.from({ length: Math.max(expectedSets, setsReps.length, 1) }, (_, i) => {
+              const setNum = i + 1;
+              const val = setsReps[i] !== undefined && setsReps[i] !== null ? setsReps[i] : '';
+              return (
+                <input
+                  key={setNum}
+                  type="number"
+                  value={val}
+                  onChange={e => {
+                    const nextVal = e.target.value === '' ? '' : Number(e.target.value);
+                    setSetsReps(prev => {
+                      const next = [...prev];
+                      while (next.length < i) next.push('');
+                      next[i] = nextVal;
+                      return next;
+                    });
+                  }}
+                  className="w-12 md:w-14 bg-zinc-950 md:bg-zinc-900 border border-zinc-700 rounded-lg py-2 px-1 text-center text-white font-mono focus:border-orange-500 outline-none text-sm"
+                  title={`Set ${setNum} Reps`}
+                />
+              );
+            })}
           </div>
             
             <div className="flex items-center p-0.5 bg-zinc-950 md:bg-zinc-900 rounded-lg border border-zinc-700 ml-1 md:ml-0">

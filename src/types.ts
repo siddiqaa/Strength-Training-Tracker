@@ -80,6 +80,14 @@ export interface Workout {
   set1: number;
   set2: number;
   set3?: number;
+  set4?: number;
+  set5?: number;
+  set6?: number;
+  set7?: number;
+  set8?: number;
+  set9?: number;
+  set10?: number;
+  [key: string]: any;
   intensity: Intensity;
   notes?: string;
   targetWeight?: number;
