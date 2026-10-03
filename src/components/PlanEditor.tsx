@@ -391,14 +391,46 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
         return `${sets} sets${vol > 0 ? `\n(${vol.toLocaleString()})` : ''}`;
       };
 
-      const volumeRows = sortedData.map(row => [
-        row.pushPull,
-        row.muscleGroup,
-        formatCellWithVol(row.heavy, row.heavyVol),
-        formatCellWithVol(row.light, row.lightVol),
-        formatCellWithVol(row.medium, row.mediumVol),
-        formatCellWithVol(row.total, row.totalVol)
-      ]);
+      const groups = sortedData.reduce((acc, row) => {
+        if (!acc[row.pushPull]) acc[row.pushPull] = [];
+        acc[row.pushPull].push(row);
+        return acc;
+      }, {} as Record<string, typeof sortedData>);
+
+      const volumeRows: any[] = [];
+      Object.entries(groups).forEach(([groupName, rows]) => {
+        const subtotal = rows.reduce((acc, row) => {
+          acc.heavy += row.heavy;
+          acc.light += row.light;
+          acc.medium += row.medium;
+          acc.total += row.total;
+          acc.heavyVol += row.heavyVol;
+          acc.lightVol += row.lightVol;
+          acc.mediumVol += row.mediumVol;
+          acc.totalVol += row.totalVol;
+          return acc;
+        }, { heavy: 0, light: 0, medium: 0, total: 0, heavyVol: 0, lightVol: 0, mediumVol: 0, totalVol: 0 });
+
+        rows.forEach(row => {
+          volumeRows.push([
+            row.pushPull,
+            row.muscleGroup,
+            formatCellWithVol(row.heavy, row.heavyVol),
+            formatCellWithVol(row.light, row.lightVol),
+            formatCellWithVol(row.medium, row.mediumVol),
+            formatCellWithVol(row.total, row.totalVol)
+          ]);
+        });
+
+        volumeRows.push([
+          `SUBTOTAL ${groupName.toUpperCase()}`,
+          '',
+          formatCellWithVol(subtotal.heavy, subtotal.heavyVol),
+          formatCellWithVol(subtotal.light, subtotal.lightVol),
+          formatCellWithVol(subtotal.medium, subtotal.mediumVol),
+          formatCellWithVol(subtotal.total, subtotal.totalVol)
+        ]);
+      });
 
       volumeRows.push([
         'DAILY TOTALS',
@@ -421,9 +453,10 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
         headStyles: { fillColor: [40, 40, 40] },
         styles: { fontSize: 10, cellPadding: 4 },
         willDrawCell: (data) => {
-          if (data.row.index === volumeRows.length - 1) {
+          const rowData = volumeRows[data.row.index];
+          if (rowData && (String(rowData[0]).startsWith('SUBTOTAL') || String(rowData[0]) === 'DAILY TOTALS')) {
             data.cell.styles.fontStyle = 'bold';
-            data.cell.styles.fillColor = [240, 240, 240];
+            data.cell.styles.fillColor = String(rowData[0]).startsWith('SUBTOTAL') ? [235, 242, 255] : [240, 240, 240];
           }
         }
       });
@@ -1197,7 +1230,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({ userPlan, onSave, onDele
     </div>
 
     {exerciseToDelete && (
-      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
           <div className="flex items-center justify-between text-white">
             <h3 className="text-lg font-black tracking-tight flex items-center gap-2 text-red-500">

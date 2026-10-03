@@ -88,7 +88,7 @@ export function Auth({ onExport }: AuthProps) {
       )}
 
       {showPurgeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 max-w-md w-full shadow-2xl text-left">
             <h3 className="text-xl font-black text-white mb-4">Purge All Data?</h3>
             <p className="text-zinc-400 text-sm mb-8 leading-relaxed">
