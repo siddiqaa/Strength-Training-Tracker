@@ -16,7 +16,7 @@ import { LogManager } from './LogManager';
 import { RestTimerModal } from './RestTimerModal';
 import { FormVideoModal } from './FormVideoModal';
 import { Plus, Database, AlertCircle, FileJson, Download, Video } from 'lucide-react';
-import { calculateShowDeloadBadge, getLastDeloadPeriod, formatDeloadPeriod, getOrderedExerciseNames, createExerciseOrderItems, parseWorkoutDate, isSameDay, isBWTarget } from '../lib/workoutUtils';
+import { calculateShowDeloadBadge, getLastDeloadPeriod, formatDeloadPeriod, getOrderedExerciseNames, createExerciseOrderItems, parseWorkoutDate, isSameDay, isBWTarget, getWorkoutTotalReps } from '../lib/workoutUtils';
 
 interface DashboardProps {
   onRegisterExport?: (exportFn: () => void) => void;
@@ -504,6 +504,23 @@ const PlanRowComponent: React.FC<{ exercise: string, target: any, intensity: Int
   const lastWorkoutWeight = lastWorkout ? lastWorkout.weight : null;
   const lastWorkoutRpe = lastWorkout ? lastWorkout.rpe : null;
 
+  const intensityHistory = React.useMemo(() => {
+    return workouts
+      .filter(w => w.exerciseName === exercise && w.intensity === intensity)
+      .sort((a, b) => b.date - a.date);
+  }, [workouts, exercise, intensity]);
+
+  const isStagnant = React.useMemo(() => {
+    if (intensityHistory.length < 2) return false;
+    const w = intensityHistory[0];
+    const prev = intensityHistory[1];
+    const weightSameOrLess = Number(w.weight) <= Number(prev.weight);
+    const wTotal = getWorkoutTotalReps(w);
+    const pTotal = getWorkoutTotalReps(prev);
+    const repsSameOrLess = wTotal <= pTotal;
+    return weightSameOrLess && repsSameOrLess;
+  }, [intensityHistory]);
+
   const isSingleDay = React.useMemo(() => {
     let count = 0;
     (['Heavy', 'Light', 'Medium'] as const).forEach(int => {
@@ -705,12 +722,14 @@ const PlanRowComponent: React.FC<{ exercise: string, target: any, intensity: Int
             )}
             <span className="text-zinc-600 mx-1.5">/</span>
             <span 
-              className={
-                lastWorkoutRpe === 'E' ? 'text-green-500 font-bold' :
-                lastWorkoutRpe === 'M' ? 'text-yellow-500 font-bold' :
-                lastWorkoutRpe === 'H' ? 'text-red-500 font-bold' :
-                'text-zinc-400'
-              } 
+              className={`px-1 rounded ${
+                isStagnant 
+                  ? 'bg-cyan-400 text-zinc-950 font-bold' 
+                  : lastWorkoutRpe === 'E' ? 'text-green-500 font-bold' :
+                    lastWorkoutRpe === 'M' ? 'text-yellow-500 font-bold' :
+                    lastWorkoutRpe === 'H' ? 'text-red-500 font-bold' :
+                    'text-zinc-400'
+              }`} 
               title="Last"
             >
               {lastWorkoutWeight !== null ? (isTargetBW || lastWorkout?.isBW ? 'BW' : lastWorkoutWeight) : '-'}

@@ -484,10 +484,6 @@ export function VolumeChart({ workouts, userPlan }: { workouts: Workout[]; userP
               margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
             >
               <defs>
-                <linearGradient id="totalVolumeGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#e4e4e7" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#e4e4e7" stopOpacity={0} />
-                </linearGradient>
                 <linearGradient id="heavyVolumeGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
                   <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
@@ -525,15 +521,6 @@ export function VolumeChart({ workouts, userPlan }: { workouts: Workout[]; userP
                 align="right"
                 iconType="circle"
                 wrapperStyle={{ paddingBottom: '12px', fontSize: '11px' }}
-              />
-              <Area
-                type="monotone"
-                dataKey="cumulativeTotal"
-                name="Total Volume"
-                stroke="#e4e4e7"
-                strokeWidth={2}
-                fillOpacity={1}
-                fill="url(#totalVolumeGradient)"
               />
               <Area
                 type="monotone"
