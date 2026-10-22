@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Workout, Intensity } from '../types';
-import { getOrderedExerciseNames, isGoalAchieved, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue } from '../lib/workoutUtils';
+import { getOrderedExerciseNames, isGoalAchieved, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue, filterLast60DaysWorkouts } from '../lib/workoutUtils';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Activity, Maximize2, Minimize2 } from 'lucide-react';
 
@@ -86,8 +86,9 @@ const SingleIntensityChart: React.FC<{
 
   const chartData = useMemo(() => {
     const dataByDate = new Map<string, any>();
+    const recentWorkouts = filterLast60DaysWorkouts(workouts);
     
-    const intensityWorkouts = workouts
+    const intensityWorkouts = recentWorkouts
       .filter(w => w.intensity === intensity && w.date)
       .sort((a, b) => a.date - b.date);
 

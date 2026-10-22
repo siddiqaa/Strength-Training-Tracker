@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Workout } from '../types';
-import { getOrderedExerciseNames, isGoalAchieved, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue } from '../lib/workoutUtils';
+import { getOrderedExerciseNames, isGoalAchieved, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue, filterLast60DaysWorkouts } from '../lib/workoutUtils';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { TrendingUp, Maximize2, Minimize2, ChevronDown, ChevronUp, Archive } from 'lucide-react';
 
@@ -118,8 +118,9 @@ const SingleExerciseChartComponent: React.FC<{
 
   const chartData = useMemo(() => {
     const dataByDate = new Map<string, any>();
+    const recentWorkouts = filterLast60DaysWorkouts(workouts);
     
-    const exerciseWorkouts = workouts
+    const exerciseWorkouts = recentWorkouts
       .filter(w => w.exerciseName === exerciseName && w.date)
       .sort((a, b) => a.date - b.date);
 

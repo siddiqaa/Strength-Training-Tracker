@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculateShowDeloadBadge, getLastDeloadPeriod, formatDeloadPeriod, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise, parseWorkoutDate, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue, calculate60DayVolumeData, calculateEffectiveWeight, getYouTubeEmbedUrl, normalizeVideoUrl, isGoalAchieved } from './workoutUtils';
+import { calculateShowDeloadBadge, getLastDeloadPeriod, formatDeloadPeriod, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise, parseWorkoutDate, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue, calculate60DayVolumeData, calculateEffectiveWeight, getYouTubeEmbedUrl, normalizeVideoUrl, isGoalAchieved, filterLast60DaysWorkouts } from './workoutUtils';
 import { Workout, UserPlan, MUSCLE_GROUPS } from '../types';
 
 describe('createExerciseOrderItems', () => {
@@ -872,6 +872,24 @@ describe('isGoalAchieved', () => {
     expect(getWorkoutTotalReps(workoutComplete)).toBe(32);
   });
 });
+
+describe('filterLast60DaysWorkouts', () => {
+  const refNow = new Date('2026-10-22T12:00:00Z');
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  it('should include workouts within the last 60 days and exclude older workouts', () => {
+    const workouts: Workout[] = [
+      { id: '1', userId: 'u1', exerciseName: 'Squat', intensity: 'Heavy', weight: 200, set1: 8, date: refNow.getTime() - (10 * dayMs) },
+      { id: '2', userId: 'u1', exerciseName: 'Squat', intensity: 'Heavy', weight: 200, set1: 8, date: refNow.getTime() - (59 * dayMs) },
+      { id: '3', userId: 'u1', exerciseName: 'Squat', intensity: 'Heavy', weight: 200, set1: 8, date: refNow.getTime() - (65 * dayMs) }, // Outside 60 days
+    ] as Workout[];
+
+    const filtered = filterLast60DaysWorkouts(workouts, refNow);
+    expect(filtered.length).toBe(2);
+    expect(filtered.map(w => w.id)).toEqual(['1', '2']);
+  });
+});
+
 
 
 

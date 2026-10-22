@@ -470,6 +470,19 @@ export interface CumulativeVolumeItem {
 }
 
 /**
+ * Filters workouts to keep only those within the last 60 days up to today.
+ */
+export function filterLast60DaysWorkouts(workouts: Workout[], now: Date = new Date()): Workout[] {
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+  const sixtyDaysAgoStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime() - 60 * 24 * 60 * 60 * 1000;
+
+  return workouts.filter(w => {
+    const time = parseWorkoutDate(w.date);
+    return time >= sixtyDaysAgoStart && time <= todayEnd;
+  });
+}
+
+/**
  * Calculates volume data for the last 60 days categorized by Heavy, Light, and Medium sessions.
  */
 export function calculate60DayVolumeData(
@@ -477,14 +490,10 @@ export function calculate60DayVolumeData(
   now: Date = new Date(),
   userPlan?: UserPlan | null
 ) {
+  // Filter workouts within the last 60 days
+  const recentWorkouts = filterLast60DaysWorkouts(workouts, now);
   const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
   const sixtyDaysAgoStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime() - 60 * 24 * 60 * 60 * 1000;
-
-  // Filter workouts within the last 60 days
-  const recentWorkouts = workouts.filter(w => {
-    const time = parseWorkoutDate(w.date);
-    return time >= sixtyDaysAgoStart && time <= todayEnd;
-  });
 
   // Group by calendar day and intensity: "YYYY-MM-DD_<intensity>"
   const sessionMap = new Map<string, SessionVolume>();
