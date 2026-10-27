@@ -17,7 +17,7 @@ import { RestTimerModal } from './RestTimerModal';
 import { FormVideoModal } from './FormVideoModal';
 import { SessionDurationTracker } from './SessionDurationTracker';
 import { Plus, Database, AlertCircle, FileJson, Download, Video } from 'lucide-react';
-import { calculateShowDeloadBadge, getLastDeloadPeriod, formatDeloadPeriod, getOrderedExerciseNames, createExerciseOrderItems, parseWorkoutDate, isSameDay, isBWTarget, getWorkoutTotalReps, formatDuration } from '../lib/workoutUtils';
+import { calculateShowDeloadBadge, getLastDeloadPeriod, formatDeloadPeriod, getOrderedExerciseNames, createExerciseOrderItems, parseWorkoutDate, isSameDay, isBWTarget, getWorkoutTotalReps, formatDuration, calculateSessionDuration, SessionDurationResult } from '../lib/workoutUtils';
 
 interface DashboardProps {
   onRegisterExport?: (exportFn: () => void) => void;
@@ -48,6 +48,10 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
       };
     });
   }, []);
+
+  const sessionStats = React.useMemo(() => {
+    return calculateSessionDuration(userPlan, intensity, enteredRepsByExercise, workouts);
+  }, [userPlan, intensity, enteredRepsByExercise, workouts]);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -425,6 +429,7 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
                     userPlan={userPlan} 
                     workouts={workouts}
                     onRepsChange={handleRepsChange}
+                    sessionStats={sessionStats}
                   />
                 );
               });
@@ -503,7 +508,8 @@ const PlanRowComponent: React.FC<{
   userPlan: UserPlan; 
   workouts: Workout[];
   onRepsChange?: (exercise: string, reps: (string | number)[]) => void;
-}> = ({ exercise, target, intensity, userPlan, workouts, onRepsChange }) => {
+  sessionStats?: SessionDurationResult;
+}> = ({ exercise, target, intensity, userPlan, workouts, onRepsChange, sessionStats }) => {
   const onRepsChangeRef = React.useRef(onRepsChange);
   useEffect(() => {
     onRepsChangeRef.current = onRepsChange;
@@ -896,6 +902,10 @@ const PlanRowComponent: React.FC<{
         restSeconds={restSeconds}
         exerciseName={exercise}
         intensity={intensity}
+        sessionRemainingSeconds={sessionStats?.remainingSeconds}
+        sessionTotalPlannedSets={sessionStats?.totalPlannedSets}
+        sessionCompletedSets={sessionStats?.completedSets}
+        sessionForecastSeconds={sessionStats?.forecastSeconds}
       />
 
       {videoUrl && (

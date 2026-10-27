@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Intensity } from '../types';
-import { X, Play, Pause, RotateCcw, Plus, Minus, Timer, CheckCircle2, Clock } from 'lucide-react';
+import { X, Play, Pause, RotateCcw, Plus, Minus, Timer, CheckCircle2, Clock, Hourglass, Dumbbell } from 'lucide-react';
+import { formatDuration } from '../lib/workoutUtils';
 
 interface RestTimerModalProps {
   isOpen: boolean;
@@ -8,6 +9,10 @@ interface RestTimerModalProps {
   restSeconds: number;
   exerciseName: string;
   intensity: Intensity;
+  sessionRemainingSeconds?: number;
+  sessionTotalPlannedSets?: number;
+  sessionCompletedSets?: number;
+  sessionForecastSeconds?: number;
 }
 
 export const RestTimerModal: React.FC<RestTimerModalProps> = ({
@@ -16,6 +21,10 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
   restSeconds,
   exerciseName,
   intensity,
+  sessionRemainingSeconds,
+  sessionTotalPlannedSets,
+  sessionCompletedSets,
+  sessionForecastSeconds,
 }) => {
   const [timeLeft, setTimeLeft] = useState(restSeconds);
   const [isRunning, setIsRunning] = useState(true);
@@ -180,7 +189,7 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
     <div 
       className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200"
     >
-      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center relative shadow-2xl flex flex-col items-center gap-6">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 sm:p-6 max-w-sm w-full text-center relative shadow-2xl flex flex-col items-center gap-4 sm:gap-5">
         {/* Manual Resync Clock Button */}
         <button
           onClick={() => {
@@ -202,7 +211,7 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
         </button>
 
         {/* Modal Header */}
-        <div className="flex flex-col items-center gap-2 w-full pt-2">
+        <div className="flex flex-col items-center gap-1.5 w-full pt-1">
           <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400">
             <Timer className="w-4 h-4 text-orange-500" />
             <span>Rest Timer</span>
@@ -216,7 +225,7 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
         </div>
 
         {/* Timer Visual Ring & Countdown */}
-        <div className="relative w-48 h-48 flex items-center justify-center">
+        <div className="relative w-40 h-40 sm:w-44 sm:h-44 flex items-center justify-center">
           {/* Circular SVG Progress */}
           <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
             <circle
@@ -308,10 +317,66 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
           </button>
         </div>
 
+        {/* Session Time & Sets Remaining Card */}
+        {(sessionRemainingSeconds !== undefined || sessionTotalPlannedSets !== undefined) && (
+          <div className="w-full bg-zinc-950/70 border border-zinc-800/80 rounded-2xl p-3 text-left">
+            <div className="grid grid-cols-2 gap-3 items-center">
+              {/* Session Time Remaining */}
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-2 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-xl flex-shrink-0">
+                  <Hourglass className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[9px] font-black uppercase tracking-wider text-zinc-500 truncate">
+                    Session Left
+                  </div>
+                  <div 
+                    className="text-sm font-black font-mono text-orange-400 truncate"
+                    title={sessionForecastSeconds !== undefined ? `Forecast Total: ${formatDuration(sessionForecastSeconds)}` : undefined}
+                  >
+                    {formatDuration(sessionRemainingSeconds ?? 0)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Sets Remaining */}
+              <div className="flex items-center gap-2.5 border-l border-zinc-800/80 pl-3 min-w-0">
+                <div className="p-2 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-xl flex-shrink-0">
+                  <Dumbbell className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[9px] font-black uppercase tracking-wider text-zinc-500 truncate">
+                    Sets Left
+                  </div>
+                  <div className="text-sm font-black font-mono text-white truncate">
+                    {Math.max(0, (sessionTotalPlannedSets ?? 0) - (sessionCompletedSets ?? 0))}{' '}
+                    {sessionTotalPlannedSets !== undefined && sessionTotalPlannedSets > 0 && (
+                      <span className="text-[10px] text-zinc-500 font-normal">
+                        ({sessionCompletedSets ?? 0}/{sessionTotalPlannedSets})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {sessionForecastSeconds !== undefined && sessionForecastSeconds > 0 && (
+              <div className="mt-2.5 pt-2 border-t border-zinc-900 flex items-center justify-between text-[9px] font-mono text-zinc-500">
+                <span>Total Forecast: <span className="text-zinc-400 font-bold">{formatDuration(sessionForecastSeconds)}</span></span>
+                {sessionTotalPlannedSets !== undefined && sessionTotalPlannedSets > 0 && (
+                  <span>
+                    {Math.min(100, Math.round(((sessionCompletedSets ?? 0) / sessionTotalPlannedSets) * 100))}% done
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Cancel / Dismiss Button */}
         <button
           onClick={onClose}
-          className="w-full py-3 bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 text-xs font-black uppercase tracking-widest rounded-xl transition-colors"
+          className="w-full py-2.5 bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 text-xs font-black uppercase tracking-widest rounded-xl transition-colors"
         >
           Cancel / Dismiss
         </button>
