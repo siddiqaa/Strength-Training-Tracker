@@ -15,8 +15,9 @@ import { SingleExerciseChart } from './ProgressChart';
 import { LogManager } from './LogManager';
 import { RestTimerModal } from './RestTimerModal';
 import { FormVideoModal } from './FormVideoModal';
+import { SessionDurationTracker } from './SessionDurationTracker';
 import { Plus, Database, AlertCircle, FileJson, Download, Video } from 'lucide-react';
-import { calculateShowDeloadBadge, getLastDeloadPeriod, formatDeloadPeriod, getOrderedExerciseNames, createExerciseOrderItems, parseWorkoutDate, isSameDay, isBWTarget, getWorkoutTotalReps } from '../lib/workoutUtils';
+import { calculateShowDeloadBadge, getLastDeloadPeriod, formatDeloadPeriod, getOrderedExerciseNames, createExerciseOrderItems, parseWorkoutDate, isSameDay, isBWTarget, getWorkoutTotalReps, formatDuration } from '../lib/workoutUtils';
 
 interface DashboardProps {
   onRegisterExport?: (exportFn: () => void) => void;
@@ -28,6 +29,25 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
   const [intensity, setIntensity] = useState<Intensity>('Heavy');
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<'data' | 'progress' | 'editor' | 'logs'>('data');
+  const [enteredRepsByExercise, setEnteredRepsByExercise] = useState<Record<string, (string | number)[]>>({});
+
+  const handleIntensityChange = (tier: Intensity) => {
+    setIntensity(tier);
+    setEnteredRepsByExercise({});
+  };
+
+  const handleRepsChange = React.useCallback((exercise: string, reps: (string | number)[]) => {
+    setEnteredRepsByExercise(prev => {
+      const prevArr = prev[exercise];
+      if (prevArr && prevArr.length === reps.length && prevArr.every((v, i) => v === reps[i])) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [exercise]: reps,
+      };
+    });
+  }, []);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -328,7 +348,7 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
                 {(['Heavy', 'Light', 'Medium'] as Intensity[]).map(tier => (
                   <button
                     key={tier}
-                    onClick={() => setIntensity(tier)}
+                    onClick={() => handleIntensityChange(tier)}
                     className={`flex-1 lg:flex-none px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
                       intensity === tier ? 'bg-orange-500 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'
                     }`}
@@ -350,7 +370,7 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
             </div>
           </div>
 
-          <div className="mb-8 p-3 bg-zinc-950/50 border border-zinc-800/50 rounded-xl text-zinc-400 text-xs flex flex-col sm:flex-row gap-4 items-center justify-center">
+          <div className="mb-6 p-3 bg-zinc-950/50 border border-zinc-800/50 rounded-xl text-zinc-400 text-xs flex flex-col sm:flex-row gap-4 items-center justify-center">
             <span className="font-bold text-zinc-300 uppercase tracking-widest text-[10px]">Target Sets, Reps, Rest:</span>
             <div className="flex flex-wrap justify-center gap-3">
                <span className="text-red-400 font-mono whitespace-nowrap">Heavy: 3×8 ({userPlan.dayMetadata?.Heavy?.restPeriod ?? 90}s rest)</span>
@@ -360,6 +380,13 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
                <span className="text-orange-400 font-mono whitespace-nowrap">Medium: 3×12 ({userPlan.dayMetadata?.Medium?.restPeriod ?? 90}s rest)</span>
             </div>
           </div>
+
+          <SessionDurationTracker
+            userPlan={userPlan}
+            intensity={intensity}
+            enteredRepsByExercise={enteredRepsByExercise}
+            workouts={workouts}
+          />
 
           <div className="space-y-3">
             <div className="hidden md:grid grid-cols-12 gap-4 px-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">
@@ -397,6 +424,7 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
                     intensity={intensity} 
                     userPlan={userPlan} 
                     workouts={workouts}
+                    onRepsChange={handleRepsChange}
                   />
                 );
               });
@@ -468,7 +496,19 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
   );
 }
 
-const PlanRowComponent: React.FC<{ exercise: string, target: any, intensity: Intensity, userPlan: UserPlan, workouts: Workout[] }> = ({ exercise, target, intensity, userPlan, workouts }) => {
+const PlanRowComponent: React.FC<{ 
+  exercise: string; 
+  target: any; 
+  intensity: Intensity; 
+  userPlan: UserPlan; 
+  workouts: Workout[];
+  onRepsChange?: (exercise: string, reps: (string | number)[]) => void;
+}> = ({ exercise, target, intensity, userPlan, workouts, onRepsChange }) => {
+  const onRepsChangeRef = React.useRef(onRepsChange);
+  useEffect(() => {
+    onRepsChangeRef.current = onRepsChange;
+  }, [onRepsChange]);
+
   const isTargetBW = isBWTarget(exercise, intensity, userPlan) || !!target?.isBW;
   const [actualWt, setActualWt] = useState<string | number>(() => {
     if (isTargetBW) return 0;
@@ -488,6 +528,10 @@ const PlanRowComponent: React.FC<{ exercise: string, target: any, intensity: Int
   const baseRest = userPlan.dayMetadata?.[intensity]?.restPeriod ?? 90;
   const additionalRest = userPlan.exerciseMetadata?.[exercise]?.additionalRest ?? 0;
   const restSeconds = baseRest + additionalRest;
+
+  const repSeconds = intensity === 'Heavy' ? 2 : 3;
+  const targetRepsNum = parseInt(String(target?.reps || '').trim(), 10) || (intensity === 'Medium' ? 12 : (intensity === 'Light' ? 15 : 8));
+  const estExerciseSeconds = (expectedSets * targetRepsNum * repSeconds) + (Math.max(0, expectedSets - 1) * restSeconds);
 
   const todayWorkout = React.useMemo(() => {
     return workouts.find(w => 
@@ -554,6 +598,7 @@ const PlanRowComponent: React.FC<{ exercise: string, target: any, intensity: Int
         }
       }
       setSetsReps(loaded);
+      onRepsChangeRef.current?.(exercise, loaded);
       setRpe(todayWorkout.rpe || 'M');
     } else {
       if (!isTargetBW) {
@@ -561,10 +606,12 @@ const PlanRowComponent: React.FC<{ exercise: string, target: any, intensity: Int
       } else {
         setActualWt(0);
       }
-      setSetsReps(Array(numSets).fill(''));
+      const emptySets = Array(numSets).fill('');
+      setSetsReps(emptySets);
+      onRepsChangeRef.current?.(exercise, emptySets);
       setRpe('M');
     }
-  }, [intensity, todayWorkout, isTargetBW, target?.weight, expectedSets]);
+  }, [intensity, todayWorkout, isTargetBW, target?.weight, expectedSets, exercise]);
 
   const handleLog = async () => {
     if (!auth.currentUser) return;
@@ -680,6 +727,9 @@ const PlanRowComponent: React.FC<{ exercise: string, target: any, intensity: Int
                 {equipment}
               </span>
             )}
+            <span className="text-[9px] font-mono text-zinc-500 bg-zinc-900/60 border border-zinc-800/80 px-1.5 py-0.5 rounded flex-shrink-0" title={`Estimated duration: ${expectedSets} sets × ${targetRepsNum} reps @ ${repSeconds}s/rep + rest`}>
+              ~{formatDuration(estExerciseSeconds)}
+            </span>
           </div>
           {todayWorkout && (
             <div className="mt-1">
@@ -776,6 +826,7 @@ const PlanRowComponent: React.FC<{ exercise: string, target: any, intensity: Int
                       const next = [...prev];
                       while (next.length < i) next.push('');
                       next[i] = nextVal;
+                      onRepsChangeRef.current?.(exercise, next);
                       return next;
                     });
                   }}

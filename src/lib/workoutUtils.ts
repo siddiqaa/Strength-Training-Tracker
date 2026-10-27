@@ -731,3 +731,270 @@ export function getYouTubeEmbedUrl(url?: string): string | null {
   return null;
 }
 
+/**
+ * Returns the estimated lifting seconds per rep based on intensity tier.
+ * Heavy: 2 seconds per rep.
+ * Light & Medium: 3 seconds per rep.
+ */
+export function getRepDurationSeconds(intensity: Intensity): number {
+  return intensity === 'Heavy' ? 2 : 3;
+}
+
+export interface SessionDurationResult {
+  intensity: Intensity;
+  secondsPerRep: number;
+  totalPlannedSets: number;
+  completedSets: number;
+  // Total Session Duration (Work + Rest)
+  forecastSeconds: number;
+  remainingSeconds: number;
+  completedSeconds: number;
+  liveForecastSeconds: number;
+  // Work Only (Pure Lifting / Time Under Tension)
+  plannedWorkSeconds: number;
+  remainingWorkSeconds: number;
+  completedWorkSeconds: number;
+  // Rest Only
+  plannedRestSeconds: number;
+  remainingRestSeconds: number;
+  completedRestSeconds: number;
+  // Progress
+  percentComplete: number;
+}
+
+/**
+ * Calculates total session duration (forecast) and remaining time as data is entered.
+ *
+ * Rules:
+ * - 2 seconds per rep for Heavy
+ * - 3 seconds per rep for Light and Medium
+ * - Rest between sets: userPlan.dayMetadata?.[intensity]?.restPeriod (default 90s)
+ *   + userPlan.exerciseMetadata?.[exercise]?.additionalRest (default 0s)
+ * - In a session of N planned sets across active exercises, there are N - 1 rest intervals
+ *   between consecutive sets (no rest following the final set of the session).
+ * - A rest interval is considered completed once the succeeding set is also entered.
+ * - Remaining time is the sum of planned work and rest for sets and intervals that have not yet been completed.
+ * - Sets are considered completed when actual reps > 0 are entered.
+ */
+export function calculateSessionDuration(
+  userPlan: UserPlan | null | undefined,
+  intensity: Intensity,
+  enteredRepsByExercise?: Record<string, (string | number)[]>,
+  workouts?: Workout[],
+  now: Date = new Date()
+): SessionDurationResult {
+  const secondsPerRep = getRepDurationSeconds(intensity);
+
+  const defaultZero: SessionDurationResult = {
+    intensity,
+    secondsPerRep,
+    totalPlannedSets: 0,
+    completedSets: 0,
+    forecastSeconds: 0,
+    remainingSeconds: 0,
+    completedSeconds: 0,
+    liveForecastSeconds: 0,
+    plannedWorkSeconds: 0,
+    remainingWorkSeconds: 0,
+    completedWorkSeconds: 0,
+    plannedRestSeconds: 0,
+    remainingRestSeconds: 0,
+    completedRestSeconds: 0,
+    percentComplete: 0,
+  };
+
+  if (!userPlan || !userPlan[intensity]) {
+    return defaultZero;
+  }
+
+  const plan = userPlan[intensity] || {};
+  const planExercises = Object.keys(plan).filter(
+    ex => !userPlan.exerciseMetadata?.[ex]?.isInactive
+  );
+  const sortedExercises = getOrderedExerciseNames(
+    userPlan.exerciseOrder,
+    planExercises
+  ).filter(ex => planExercises.includes(ex));
+
+  if (sortedExercises.length === 0) {
+    return defaultZero;
+  }
+
+  const baseRest = Number(userPlan.dayMetadata?.[intensity]?.restPeriod) || 90;
+
+  interface FlatSetItem {
+    exercise: string;
+    setIndex: number;
+    plannedReps: number;
+    workSeconds: number;
+    restSeconds: number;
+    isCompleted: boolean;
+    actualReps: number;
+  }
+
+  const allSets: FlatSetItem[] = [];
+
+  sortedExercises.forEach(exercise => {
+    const target: Partial<PlannedSet> = plan[exercise] || {};
+    const plannedSets = target.sets !== undefined && Number(target.sets) > 0
+      ? Number(target.sets)
+      : (intensity === 'Light' ? 2 : 3);
+    const plannedReps = parseInt(String(target.reps || '').trim(), 10) ||
+      (intensity === 'Medium' ? 12 : (intensity === 'Light' ? 15 : 8));
+
+    const additionalRest = Number(userPlan.exerciseMetadata?.[exercise]?.additionalRest) || 0;
+    const restSeconds = Math.max(0, baseRest + additionalRest);
+
+    let repsArr = enteredRepsByExercise?.[exercise];
+    if ((!repsArr || repsArr.length === 0) && workouts) {
+      const todayWorkout = workouts.find(w =>
+        w.exerciseName === exercise &&
+        w.intensity === intensity &&
+        isSameDay(w.date, now)
+      );
+      if (todayWorkout) {
+        repsArr = [];
+        for (let i = 1; i <= plannedSets; i++) {
+          const val = todayWorkout[`set${i}`];
+          if (val !== undefined && val !== null && Number(val) > 0) {
+            repsArr.push(Number(val));
+          } else {
+            repsArr.push('');
+          }
+        }
+      }
+    }
+
+    for (let s = 0; s < plannedSets; s++) {
+      const rawVal = repsArr?.[s];
+      const isCompleted = rawVal !== undefined && rawVal !== '' && !isNaN(Number(rawVal)) && Number(rawVal) > 0;
+      const actualReps = isCompleted ? Number(rawVal) : 0;
+
+      allSets.push({
+        exercise,
+        setIndex: s,
+        plannedReps,
+        workSeconds: plannedReps * secondsPerRep,
+        restSeconds,
+        isCompleted,
+        actualReps,
+      });
+    }
+  });
+
+  const totalPlannedSets = allSets.length;
+  if (totalPlannedSets === 0) {
+    return defaultZero;
+  }
+
+  let plannedWorkSeconds = 0;
+  let remainingWorkSeconds = 0;
+  let completedWorkSeconds = 0;
+  let completedSets = 0;
+
+  allSets.forEach(setItem => {
+    plannedWorkSeconds += setItem.workSeconds;
+
+    if (setItem.isCompleted) {
+      completedSets++;
+      completedWorkSeconds += setItem.actualReps * secondsPerRep;
+    } else {
+      remainingWorkSeconds += setItem.workSeconds;
+    }
+  });
+
+  // Calculate rest intervals (exactly totalPlannedSets - 1 intervals between consecutive sets)
+  let plannedRestSeconds = 0;
+  let remainingRestSeconds = 0;
+  let completedRestSeconds = 0;
+
+  for (let k = 0; k < totalPlannedSets - 1; k++) {
+    const rest = allSets[k].restSeconds;
+    plannedRestSeconds += rest;
+
+    // A rest interval is completed if both the preceding and succeeding sets have been completed
+    const isRestCompleted = allSets[k].isCompleted && allSets[k + 1].isCompleted;
+    if (isRestCompleted) {
+      completedRestSeconds += rest;
+    } else {
+      remainingRestSeconds += rest;
+    }
+  }
+
+  const forecastSeconds = plannedWorkSeconds + plannedRestSeconds;
+  const remainingSeconds = remainingWorkSeconds + remainingRestSeconds;
+  const completedSeconds = completedWorkSeconds + completedRestSeconds;
+  const liveForecastSeconds = completedSeconds + remainingSeconds;
+  const percentComplete = totalPlannedSets > 0
+    ? Math.min(100, Math.round((completedSets / totalPlannedSets) * 100))
+    : 0;
+
+  return {
+    intensity,
+    secondsPerRep,
+    totalPlannedSets,
+    completedSets,
+    forecastSeconds,
+    remainingSeconds,
+    completedSeconds,
+    liveForecastSeconds,
+    plannedWorkSeconds,
+    remainingWorkSeconds,
+    completedWorkSeconds,
+    plannedRestSeconds,
+    remainingRestSeconds,
+    completedRestSeconds,
+    percentComplete,
+  };
+}
+
+/**
+ * Formats seconds into human-readable duration, e.g. "42m 30s", "1h 15m", or "45s".
+ */
+export function formatDuration(seconds: number): string {
+  if (seconds <= 0) return '0s';
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+
+  if (hrs > 0) {
+    if (mins > 0 && secs > 0) {
+      return `${hrs}h ${mins}m ${secs}s`;
+    }
+    if (mins > 0) {
+      return `${hrs}h ${mins}m`;
+    }
+    if (secs > 0) {
+      return `${hrs}h ${secs}s`;
+    }
+    return `${hrs}h`;
+  }
+
+  if (mins > 0) {
+    if (secs > 0) {
+      return `${mins}m ${secs}s`;
+    }
+    return `${mins}m`;
+  }
+
+  return `${secs}s`;
+}
+
+/**
+ * Formats seconds into digital timer display, e.g. "42:30" or "1:15:00".
+ */
+export function formatClockTime(seconds: number): string {
+  if (seconds <= 0) return '00:00';
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+
+  const mm = String(mins).padStart(2, '0');
+  const ss = String(secs).padStart(2, '0');
+
+  if (hrs > 0) {
+    return `${hrs}:${mm}:${ss}`;
+  }
+  return `${mm}:${ss}`;
+}
+

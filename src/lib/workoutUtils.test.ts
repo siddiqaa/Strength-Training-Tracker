@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculateShowDeloadBadge, getLastDeloadPeriod, formatDeloadPeriod, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise, parseWorkoutDate, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue, calculate60DayVolumeData, calculateEffectiveWeight, getYouTubeEmbedUrl, normalizeVideoUrl, isGoalAchieved, filterLast60DaysWorkouts } from './workoutUtils';
+import { calculateShowDeloadBadge, getLastDeloadPeriod, formatDeloadPeriod, getOrderedExerciseNames, createExerciseOrderItems, createExerciseOrderTuples, isSameDay, getLastDayWorkoutForExercise, parseWorkoutDate, isBWTarget, getWorkoutTotalReps, getWorkoutPlotValue, calculate60DayVolumeData, calculateEffectiveWeight, getYouTubeEmbedUrl, normalizeVideoUrl, isGoalAchieved, filterLast60DaysWorkouts, getRepDurationSeconds, calculateSessionDuration, formatDuration, formatClockTime } from './workoutUtils';
 import { Workout, UserPlan, MUSCLE_GROUPS } from '../types';
 
 describe('createExerciseOrderItems', () => {
@@ -889,6 +889,201 @@ describe('filterLast60DaysWorkouts', () => {
     expect(filtered.map(w => w.id)).toEqual(['1', '2']);
   });
 });
+
+describe('Session Duration & Rep Cadence Calculations', () => {
+  it('should use 2 seconds per rep for heavy and 3 seconds per rep for light and medium', () => {
+    expect(getRepDurationSeconds('Heavy')).toBe(2);
+    expect(getRepDurationSeconds('Light')).toBe(3);
+    expect(getRepDurationSeconds('Medium')).toBe(3);
+  });
+
+  const samplePlan: UserPlan = {
+    userId: 'u1',
+    Heavy: {
+      'Bench Press': { weight: 200, sets: 3, reps: '8' },
+    },
+    Light: {
+      'Bench Press': { weight: 120, sets: 2, reps: '15' },
+    },
+    Medium: {
+      'Bench Press': { weight: 150, sets: 3, reps: '12' },
+    },
+    dayMetadata: {
+      Heavy: { restPeriod: 90 },
+      Light: { restPeriod: 90 },
+      Medium: { restPeriod: 90 },
+    }
+  };
+
+  it('should calculate forecast duration for Heavy (2s/rep) with inter-set rest', () => {
+    // 3 sets x 8 reps = 24 reps @ 2s = 48s work
+    // 3 sets has 2 rest intervals of 90s = 180s rest
+    // Total forecast = 48s + 180s = 228s
+    const result = calculateSessionDuration(samplePlan, 'Heavy');
+    expect(result.secondsPerRep).toBe(2);
+    expect(result.totalPlannedSets).toBe(3);
+    expect(result.plannedWorkSeconds).toBe(48);
+    expect(result.plannedRestSeconds).toBe(180);
+    expect(result.forecastSeconds).toBe(228);
+    expect(result.remainingSeconds).toBe(228);
+    expect(result.completedSeconds).toBe(0);
+    expect(result.percentComplete).toBe(0);
+  });
+
+  it('should calculate forecast duration for Light (3s/rep)', () => {
+    // 2 sets x 15 reps = 30 reps @ 3s = 90s work
+    // 2 sets has 1 rest interval of 90s = 90s rest
+    // Total forecast = 90s + 90s = 180s
+    const result = calculateSessionDuration(samplePlan, 'Light');
+    expect(result.secondsPerRep).toBe(3);
+    expect(result.totalPlannedSets).toBe(2);
+    expect(result.plannedWorkSeconds).toBe(90);
+    expect(result.plannedRestSeconds).toBe(90);
+    expect(result.forecastSeconds).toBe(180);
+    expect(result.remainingSeconds).toBe(180);
+  });
+
+  it('should calculate forecast duration for Medium (3s/rep)', () => {
+    // 3 sets x 12 reps = 36 reps @ 3s = 108s work
+    // 3 sets has 2 rest intervals of 90s = 180s rest
+    // Total forecast = 108s + 180s = 288s
+    const result = calculateSessionDuration(samplePlan, 'Medium');
+    expect(result.secondsPerRep).toBe(3);
+    expect(result.totalPlannedSets).toBe(3);
+    expect(result.plannedWorkSeconds).toBe(108);
+    expect(result.plannedRestSeconds).toBe(180);
+    expect(result.forecastSeconds).toBe(288);
+  });
+
+  it('should dynamically update remaining and completed time as data is entered set-by-set', () => {
+    // Heavy Bench: Set 1 (8 reps @ 2s = 16s + 90s rest = 106s)
+    // Set 2 (8 reps @ 2s = 16s + 90s rest = 106s)
+    // Set 3 (8 reps @ 2s = 16s + 0s rest = 16s)
+    // Total forecast = 228s
+    
+    // User enters Set 1 (8 reps)
+    const afterSet1 = calculateSessionDuration(samplePlan, 'Heavy', {
+      'Bench Press': [8]
+    });
+    expect(afterSet1.completedSets).toBe(1);
+    expect(afterSet1.completedWorkSeconds).toBe(16);
+    expect(afterSet1.completedRestSeconds).toBe(0);
+    expect(afterSet1.completedSeconds).toBe(16);
+    expect(afterSet1.remainingWorkSeconds).toBe(32);
+    expect(afterSet1.remainingRestSeconds).toBe(180);
+    expect(afterSet1.remainingSeconds).toBe(212); // 32s work + 180s rest = 212s
+    expect(afterSet1.percentComplete).toBe(33);
+
+    // User enters Set 2 (8 reps)
+    const afterSet2 = calculateSessionDuration(samplePlan, 'Heavy', {
+      'Bench Press': [8, 8]
+    });
+    expect(afterSet2.completedSets).toBe(2);
+    expect(afterSet2.completedWorkSeconds).toBe(32);
+    expect(afterSet2.completedRestSeconds).toBe(90);
+    expect(afterSet2.completedSeconds).toBe(122); // 32s work + 90s rest = 122s
+    expect(afterSet2.remainingWorkSeconds).toBe(16);
+    expect(afterSet2.remainingRestSeconds).toBe(90);
+    expect(afterSet2.remainingSeconds).toBe(106); // 16s work + 90s rest = 106s
+    expect(afterSet2.percentComplete).toBe(67);
+
+    // User enters Set 3 (8 reps) -> Session completed!
+    const afterSet3 = calculateSessionDuration(samplePlan, 'Heavy', {
+      'Bench Press': [8, 8, 8]
+    });
+    expect(afterSet3.completedSets).toBe(3);
+    expect(afterSet3.completedWorkSeconds).toBe(48);
+    expect(afterSet3.completedRestSeconds).toBe(180);
+    expect(afterSet3.completedSeconds).toBe(228);
+    expect(afterSet3.remainingSeconds).toBe(0);
+    expect(afterSet3.percentComplete).toBe(100);
+  });
+
+  it('should correctly handle multi-exercise sessions and additionalRest', () => {
+    const multiPlan: UserPlan = {
+      userId: 'u1',
+      Heavy: {
+        'Squat': { weight: 225, sets: 2, reps: '8' },
+        'Bench Press': { weight: 185, sets: 2, reps: '8' },
+      },
+      Light: {},
+      Medium: {},
+      exerciseOrder: [{ exercise: 'Squat', position: 0 }, { exercise: 'Bench Press', position: 1 }],
+      exerciseMetadata: {
+        'Squat': { additionalRest: 30 } // 90 + 30 = 120s rest
+      },
+      dayMetadata: {
+        Heavy: { restPeriod: 90 }
+      }
+    };
+
+    // Squat: 2 sets x 8 reps @ 2s = 32s work. Rest = 120s
+    // Bench: 2 sets x 8 reps @ 2s = 32s work. Rest = 90s
+    // Sets in session:
+    // Set 1 (Squat): 16s work + 120s rest
+    // Set 2 (Squat): 16s work + 120s rest (transition to Bench)
+    // Set 3 (Bench): 16s work + 90s rest
+    // Set 4 (Bench): 16s work + 0s rest (last set)
+    // Total planned work: 64s
+    // Total planned rest: 120 + 120 + 90 = 330s
+    // Total forecast = 64s + 330s = 394s
+    const result = calculateSessionDuration(multiPlan, 'Heavy');
+    expect(result.totalPlannedSets).toBe(4);
+    expect(result.plannedWorkSeconds).toBe(64);
+    expect(result.plannedRestSeconds).toBe(330);
+    expect(result.forecastSeconds).toBe(394);
+    expect(result.remainingSeconds).toBe(394);
+
+    // Enter Squat sets
+    const afterSquats = calculateSessionDuration(multiPlan, 'Heavy', {
+      'Squat': [8, 8]
+    });
+    expect(afterSquats.completedSets).toBe(2);
+    // Completed: Squat 1 (16s) + Rest 0 (120s) + Squat 2 (16s) = 152s
+    expect(afterSquats.completedSeconds).toBe(152);
+    // Remaining: Rest 1 (120s transition) + Bench 1 (16s) + Rest 2 (90s) + Bench 2 (16s) = 242s
+    expect(afterSquats.remainingSeconds).toBe(242);
+    expect(afterSquats.completedSeconds + afterSquats.remainingSeconds).toBe(394);
+  });
+
+  it('should ignore inactive exercises in userPlan', () => {
+    const planWithInactive: UserPlan = {
+      userId: 'u1',
+      Heavy: {
+        'Squat': { weight: 225, sets: 2, reps: '8' },
+        'Paused Movement': { weight: 100, sets: 3, reps: '10' },
+      },
+      Light: {},
+      Medium: {},
+      exerciseMetadata: {
+        'Paused Movement': { isInactive: true }
+      }
+    };
+
+    const result = calculateSessionDuration(planWithInactive, 'Heavy');
+    // Only Squat is active (2 sets)
+    expect(result.totalPlannedSets).toBe(2);
+  });
+});
+
+describe('formatDuration and formatClockTime', () => {
+  it('should format seconds into readable strings', () => {
+    expect(formatDuration(0)).toBe('0s');
+    expect(formatDuration(45)).toBe('45s');
+    expect(formatDuration(90)).toBe('1m 30s');
+    expect(formatDuration(120)).toBe('2m');
+    expect(formatDuration(3600)).toBe('1h');
+    expect(formatDuration(3665)).toBe('1h 1m 5s');
+  });
+
+  it('should format seconds into digital clock time', () => {
+    expect(formatClockTime(0)).toBe('00:00');
+    expect(formatClockTime(45)).toBe('00:45');
+    expect(formatClockTime(90)).toBe('01:30');
+    expect(formatClockTime(3665)).toBe('1:01:05');
+  });
+});
+
 
 
 
