@@ -17,7 +17,7 @@ import { RestTimerModal } from './RestTimerModal';
 import { FormVideoModal } from './FormVideoModal';
 import { SessionDurationTracker } from './SessionDurationTracker';
 import { Plus, Database, AlertCircle, FileJson, Download, Video } from 'lucide-react';
-import { calculateShowDeloadBadge, getLastDeloadPeriod, formatDeloadPeriod, getOrderedExerciseNames, createExerciseOrderItems, parseWorkoutDate, isSameDay, isBWTarget, getWorkoutTotalReps, formatDuration, calculateSessionDuration, SessionDurationResult } from '../lib/workoutUtils';
+import { calculateShowDeloadBadge, getLastDeloadPeriod, formatDeloadPeriod, getOrderedExerciseNames, createExerciseOrderItems, parseWorkoutDate, isSameDay, isBWTarget, getWorkoutTotalReps, calculateSessionDuration, SessionDurationResult } from '../lib/workoutUtils';
 
 interface DashboardProps {
   onRegisterExport?: (exportFn: () => void) => void;
@@ -535,10 +535,6 @@ const PlanRowComponent: React.FC<{
   const additionalRest = userPlan.exerciseMetadata?.[exercise]?.additionalRest ?? 0;
   const restSeconds = baseRest + additionalRest;
 
-  const repSeconds = intensity === 'Heavy' ? 2 : 3;
-  const targetRepsNum = parseInt(String(target?.reps || '').trim(), 10) || (intensity === 'Medium' ? 12 : (intensity === 'Light' ? 15 : 8));
-  const estExerciseSeconds = (expectedSets * targetRepsNum * repSeconds) + (Math.max(0, expectedSets - 1) * restSeconds);
-
   const todayWorkout = React.useMemo(() => {
     return workouts.find(w => 
       w.exerciseName === exercise && 
@@ -714,7 +710,12 @@ const PlanRowComponent: React.FC<{
               }`} 
               title={exercise}
             >
-              {exercise}
+              <span className="md:hidden">
+                {exercise.slice(0, 12)}
+              </span>
+              <span className="hidden md:inline">
+                {exercise}
+              </span>
             </span>
             {isSingleDay && <span title="One Day a Week Only" className="flex items-center"><AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" /></span>}
             {videoUrl && (
@@ -733,9 +734,6 @@ const PlanRowComponent: React.FC<{
                 {equipment}
               </span>
             )}
-            <span className="text-[9px] font-mono text-zinc-500 bg-zinc-900/60 border border-zinc-800/80 px-1.5 py-0.5 rounded flex-shrink-0" title={`Estimated duration: ${expectedSets} sets × ${targetRepsNum} reps @ ${repSeconds}s/rep + rest`}>
-              ~{formatDuration(estExerciseSeconds)}
-            </span>
           </div>
           {todayWorkout && (
             <div className="mt-1">
@@ -769,14 +767,14 @@ const PlanRowComponent: React.FC<{
           )}
         </div>
         
-        <div className="md:col-span-2 flex flex-col items-center justify-center font-mono text-sm bg-zinc-900/80 py-1.5 md:py-2 px-3 rounded-xl border border-zinc-800">
+        <div className="md:col-span-2 flex flex-col items-center justify-center font-mono text-xs md:text-sm bg-zinc-900/80 py-1.5 md:py-2 px-2 md:px-3 rounded-xl border border-zinc-800">
           <div className="flex items-center justify-center">
             {isTargetBW ? (
               <span className="text-orange-400 font-bold" title="Plan (Bodyweight)">BW</span>
             ) : (
               <span className="text-white" title="Plan">{target.weight}</span>
             )}
-            <span className="text-zinc-600 mx-1.5">/</span>
+            <span className="text-zinc-600 mx-1 md:mx-1.5">/</span>
             <span 
               className={`px-1 rounded ${
                 isStagnant 
@@ -792,13 +790,13 @@ const PlanRowComponent: React.FC<{
             </span>
             {calcWeight !== null && !isTargetBW && (
               <>
-                <span className="text-zinc-600 mx-1.5">/</span>
+                <span className="text-zinc-600 mx-1 md:mx-1.5">/</span>
                 <span className="text-black bg-zinc-300 px-1 rounded" title="Calculated">{calcWeight}</span>
               </>
             )}
           </div>
           {!isTargetBW && equipment && (equipment === 'barbell' || equipment === '2 dumbbell') && (
-            <span className="text-xs text-zinc-400 font-mono font-medium mt-0.5" title={equipment === 'barbell' ? 'Effective: Plate wt x 2 + 45 lb bar' : 'Effective: Dumbbell wt x 2'}>
+            <span className="text-[10px] md:text-xs text-zinc-400 font-mono font-medium mt-0.5" title={equipment === 'barbell' ? 'Effective: Plate wt x 2 + 45 lb bar' : 'Effective: Dumbbell wt x 2'}>
               {equipment === 'barbell' ? `eff: ${(Number(target.weight || 0) * 2) + 45} lb` : `eff: ${Number(target.weight || 0) * 2} lb`}
             </span>
           )}
