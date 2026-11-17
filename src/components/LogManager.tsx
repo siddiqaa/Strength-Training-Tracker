@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { Workout, OperationType } from '../types';
+import { Workout, UserPlan, OperationType } from '../types';
 import { db, handleFirestoreError } from '../lib/firebase';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { Trash2, Edit2, Check, X, Calendar, Dumbbell, Hash, Target, ChevronUp, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
+import { isGoalAchieved } from '../lib/workoutUtils';
 
 interface LogManagerProps {
   workouts: Workout[];
+  userPlan?: UserPlan | null;
 }
 
-export function LogManager({ workouts }: LogManagerProps) {
+export function LogManager({ workouts, userPlan }: LogManagerProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Workout>>({});
@@ -76,6 +78,19 @@ export function LogManager({ workouts }: LogManagerProps) {
           updateValues.date = newDateObj.getTime();
         }
       }
+
+      const existingWorkout = workouts.find(w => w.id === id);
+      const mergedWorkout: Workout = {
+        ...(existingWorkout || {}),
+        ...updateValues,
+        userId: existingWorkout?.userId || '',
+        exerciseName: updateValues.exerciseName || existingWorkout?.exerciseName || '',
+        weight: updateValues.weight !== undefined ? updateValues.weight : (existingWorkout?.weight || 0),
+        intensity: (updateValues.intensity || existingWorkout?.intensity || 'Heavy') as any,
+        date: updateValues.date || existingWorkout?.date || Date.now(),
+      } as Workout;
+
+      updateValues.goalAchieved = isGoalAchieved(mergedWorkout, userPlan || undefined);
 
       await updateDoc(workoutRef, updateValues as any);
       setEditingId(null);

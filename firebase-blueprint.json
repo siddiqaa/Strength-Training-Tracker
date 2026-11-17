@@ -38,6 +38,10 @@
         "notes": {
           "type": "string",
           "description": "Optional notes about the set."
+        },
+        "goalAchieved": {
+          "type": "boolean",
+          "description": "Whether the workout target sets and reps were achieved."
         }
       },
       "required": ["userId", "date", "exerciseName", "weight", "reps", "intensity"]

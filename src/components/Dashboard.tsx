@@ -17,7 +17,7 @@ import { RestTimerModal } from './RestTimerModal';
 import { FormVideoModal } from './FormVideoModal';
 import { SessionDurationTracker } from './SessionDurationTracker';
 import { Plus, Database, AlertCircle, FileJson, Download, Video } from 'lucide-react';
-import { calculateShowDeloadBadge, getLastDeloadPeriod, formatDeloadPeriod, getOrderedExerciseNames, createExerciseOrderItems, parseWorkoutDate, isSameDay, isBWTarget, getWorkoutTotalReps, calculateSessionDuration, SessionDurationResult } from '../lib/workoutUtils';
+import { calculateShowDeloadBadge, getLastDeloadPeriod, formatDeloadPeriod, getOrderedExerciseNames, createExerciseOrderItems, parseWorkoutDate, isSameDay, isBWTarget, getWorkoutTotalReps, calculateSessionDuration, SessionDurationResult, isGoalAchieved } from '../lib/workoutUtils';
 
 interface DashboardProps {
   onRegisterExport?: (exportFn: () => void) => void;
@@ -234,6 +234,7 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
             for (let s = 1; s <= count; s++) {
               workoutSeed[`set${s}`] = targetReps;
             }
+            workoutSeed.goalAchieved = true;
             batch.set(docRef, workoutSeed);
           }
         }
@@ -494,7 +495,7 @@ export function Dashboard({ onRegisterExport }: DashboardProps) {
 
       {activeTab === 'logs' && (
         <div className="mt-4">
-          <LogManager workouts={workouts} />
+          <LogManager workouts={workouts} userPlan={userPlan} />
         </div>
       )}
     </div>
@@ -645,6 +646,8 @@ const PlanRowComponent: React.FC<{
           workoutData[`set${setNum}`] = safeReps;
         }
       }
+
+      workoutData.goalAchieved = isGoalAchieved(workoutData as Workout, userPlan);
 
       if (todayWorkout?.id) {
         await setDoc(doc(db, 'workouts', todayWorkout.id), workoutData);

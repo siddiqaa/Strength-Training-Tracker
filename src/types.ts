@@ -95,6 +95,7 @@ export interface Workout {
   targetSets?: number;
   rpe?: 'E' | 'M' | 'H';
   isBW?: boolean;
+  goalAchieved?: boolean;
 }
 
 export interface UserProfile {

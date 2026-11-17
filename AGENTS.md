@@ -21,7 +21,7 @@
 - **`IntensityChart.tsx`**: Intensity Tracker section visualizing progression (Weight/RPE) across Heavy, Medium, and Light intensities in a 3-column grid layout (single column on mobile), with a desktop-only full-width expand toggle on each chart and single-point hover tooltips.
 - **`ProgressChart.tsx`**: Individual exercise progress tracker visualizing progression (Weight/RPE) per exercise across Heavy, Medium, and Light intensities, embedded directly into each exercise's entry card below the Log button in the Entry tab.
 - **`VolumeChart.tsx`**: Volume Tracker section visualizing total training volume over the last 60 days categorized by Heavy, Medium, and Light sessions, featuring session-by-session bar charts, weekly load aggregations, and cumulative volume curves.
-- **`RestTimerModal.tsx`**: Modal for rest countdown timer with sound notifications, backdrop click and ESC key dismiss support without cancelling saved logs.
+- **`RestTimerModal.tsx`**: Modal for rest countdown timer with sound notifications, reduced height, non-blocking viewable/scrollable background interaction, and ESC key / button dismiss support without cancelling saved logs.
 - **`workoutUtils.ts` & `workoutUtils.test.ts`**: Utilities for parsing Firestore dates safely (`parseWorkoutDate`), date comparison (`isSameDay`), deload detection and period calculation (`calculateShowDeloadBadge`, `getLastDeloadPeriod`, `formatDeloadPeriod`), exercise ordering, 60-day volume calculation, and unit tests.
 
 ## Progress Tab Layout Order

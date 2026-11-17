@@ -871,6 +871,38 @@ describe('isGoalAchieved', () => {
     expect(isGoalAchieved(workoutComplete, plan4Sets)).toBe(true);
     expect(getWorkoutTotalReps(workoutComplete)).toBe(32);
   });
+
+  it('should prioritize stored goalAchieved when present and fall back to isGoalAchieved when undefined', () => {
+    const historicalWorkoutWithStoredFalse: Workout = {
+      userId: 'u1',
+      exerciseName: 'Bench Press',
+      intensity: 'Heavy',
+      weight: 200,
+      set1: 8,
+      set2: 8,
+      set3: 8,
+      goalAchieved: false, // Explicitly failed e.g. missed 4th planned set
+      date: Date.now()
+    };
+    // Even though 3 sets of 8 would pass dynamic calculation against a 3-set plan,
+    // the stored goalAchieved: false takes precedence via (workout.goalAchieved ?? isGoalAchieved(workout, plan))
+    const resolvedStatus = historicalWorkoutWithStoredFalse.goalAchieved ?? isGoalAchieved(historicalWorkoutWithStoredFalse, plan);
+    expect(resolvedStatus).toBe(false);
+
+    const legacyWorkoutWithoutStoredField: Workout = {
+      userId: 'u1',
+      exerciseName: 'Bench Press',
+      intensity: 'Heavy',
+      weight: 200,
+      set1: 8,
+      set2: 8,
+      set3: 8,
+      date: Date.now()
+    };
+    // Falls back to isGoalAchieved, which returns true for 3 sets of 8
+    const legacyResolved = legacyWorkoutWithoutStoredField.goalAchieved ?? isGoalAchieved(legacyWorkoutWithoutStoredField, plan);
+    expect(legacyResolved).toBe(true);
+  });
 });
 
 describe('filterLast60DaysWorkouts', () => {

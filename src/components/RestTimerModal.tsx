@@ -187,89 +187,76 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 pointer-events-none z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-150"
     >
-      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 sm:p-6 max-w-sm w-full text-center relative shadow-2xl flex flex-col items-center gap-4 sm:gap-5">
-        {/* Manual Resync Clock Button */}
-        <button
-          onClick={() => {
-            syncTimeLeft();
-          }}
-          className="absolute top-4 left-4 p-2 text-zinc-500 hover:text-orange-400 hover:bg-zinc-800 rounded-full transition-colors"
-          title="Manual Sync with System Clock"
-        >
-          <Clock className="w-5 h-5" />
-        </button>
-
-        {/* Close / Dismiss button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-full transition-colors"
-          title="Cancel / Dismiss Timer"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        {/* Modal Header */}
-        <div className="flex flex-col items-center gap-1.5 w-full pt-1">
-          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400">
-            <Timer className="w-4 h-4 text-orange-500" />
-            <span>Rest Timer</span>
-          </div>
-          <h3 className="text-xl font-black text-white truncate max-w-[240px]" title={exerciseName}>
-            {exerciseName}
-          </h3>
-          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${intensityBadgeClass}`}>
-            {intensity} Day ({restSeconds}s Rest)
-          </span>
-        </div>
-
-        {/* Timer Visual Ring & Countdown */}
-        <div className="relative w-40 h-40 sm:w-44 sm:h-44 flex items-center justify-center">
-          {/* Circular SVG Progress */}
-          <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-            <circle
-              cx="50"
-              cy="50"
-              r="42"
-              className="stroke-zinc-800"
-              strokeWidth="6"
-              fill="transparent"
-            />
-            <circle
-              cx="50"
-              cy="50"
-              r="42"
-              className={`transition-all duration-1000 ease-linear ${
-                hasFinished ? 'stroke-green-500' : 'stroke-orange-500'
-              }`}
-              strokeWidth="6"
-              strokeDasharray="263.89"
-              strokeDashoffset={263.89 - (263.89 * progressPercent) / 100}
-              strokeLinecap="round"
-              fill="transparent"
-            />
-          </svg>
-
-          {/* Time Display */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            {hasFinished ? (
-              <div className="flex flex-col items-center gap-1 animate-bounce">
-                <CheckCircle2 className="w-10 h-10 text-green-500" />
-                <span className="text-xs font-black text-green-400 uppercase tracking-widest mt-1">
-                  Rest Done!
+      <div className="pointer-events-auto bg-zinc-900 border border-zinc-700 rounded-3xl p-5 sm:p-6 max-w-md w-full text-center relative shadow-2xl shadow-black/80 flex flex-col gap-4 sm:gap-5">
+        {/* Header: Exercise info + Sync & Close actions */}
+        <div className="flex items-start justify-between w-full pb-3 border-b border-zinc-800">
+          <div className="flex items-center gap-3 min-w-0 text-left">
+            <div className="p-2.5 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-xl flex-shrink-0">
+              <Timer className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base sm:text-lg font-black text-white truncate max-w-[200px] sm:max-w-[240px]" title={exerciseName}>
+                  {exerciseName}
+                </h3>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-wider border flex-shrink-0 ${intensityBadgeClass}`}>
+                  {intensity}
                 </span>
               </div>
-            ) : (
-              <>
-                <span className="text-4xl font-mono font-black text-white tracking-tight">
-                  {formatTime(timeLeft)}
-                </span>
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-1">
-                  {isRunning ? 'Resting...' : 'Paused'}
-                </span>
-              </>
-            )}
+              <span className="text-xs text-zinc-400 font-medium block mt-0.5">
+                Target Rest: <span className="font-mono text-zinc-300 font-bold">{restSeconds}s</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+            <button
+              onClick={syncTimeLeft}
+              className="p-2 text-zinc-400 hover:text-orange-400 hover:bg-zinc-800 rounded-xl transition-colors"
+              title="Sync with System Clock"
+            >
+              <Clock className="w-5 h-5" />
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors"
+              title="Dismiss Timer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Digital Countdown & Linear Progress (No Circle) */}
+        <div className="w-full flex flex-col items-center justify-center py-2 sm:py-3">
+          {hasFinished ? (
+            <div className="flex items-center gap-2.5 text-green-400 py-2 animate-bounce">
+              <CheckCircle2 className="w-8 h-8" />
+              <span className="text-xl sm:text-2xl font-black uppercase tracking-widest">
+                Rest Done!
+              </span>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-1.5">
+              <span className="text-5xl sm:text-6xl font-mono font-black text-white tracking-tight leading-none drop-shadow">
+                {formatTime(timeLeft)}
+              </span>
+              <span className={`text-xs sm:text-sm font-black uppercase tracking-widest ${isRunning ? 'text-orange-400' : 'text-zinc-500'}`}>
+                {isRunning ? 'Resting...' : 'Paused'}
+              </span>
+            </div>
+          )}
+
+          {/* Sleek linear progress indicator */}
+          <div className="w-full bg-zinc-800/90 h-2 sm:h-2.5 rounded-full overflow-hidden mt-3 sm:mt-4 shadow-inner">
+            <div
+              className={`h-full transition-all duration-300 ease-linear ${
+                hasFinished ? 'bg-green-500 shadow-green-500/50' : 'bg-orange-500 shadow-orange-500/50'
+              }`}
+              style={{ width: `${progressPercent}%` }}
+            />
           </div>
         </div>
 
@@ -278,16 +265,16 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
           <button
             onClick={() => handleAdjustTime(-10)}
             disabled={timeLeft <= 0}
-            className="p-2.5 bg-zinc-950 border border-zinc-800 text-zinc-400 rounded-xl hover:text-white hover:border-zinc-700 transition-colors disabled:opacity-40"
+            className="px-3 sm:px-4 py-2.5 sm:py-3 bg-zinc-950 border border-zinc-800 text-zinc-300 rounded-xl hover:text-white hover:border-zinc-700 transition-colors disabled:opacity-40 text-xs sm:text-sm font-bold font-mono active:scale-95"
             title="Subtract 10 Seconds"
           >
-            <Minus className="w-4 h-4" />
+            -10s
           </button>
 
           <button
             onClick={handleTogglePlayPause}
             disabled={hasFinished}
-            className="flex-1 py-2.5 px-4 bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-orange-600 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-40 shadow-lg"
+            className="flex-1 py-2.5 sm:py-3 px-4 bg-orange-500 text-white rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-40 shadow-lg shadow-orange-500/20 active:scale-95"
           >
             {isRunning ? (
               <>
@@ -302,15 +289,15 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
 
           <button
             onClick={() => handleAdjustTime(10)}
-            className="p-2.5 bg-zinc-950 border border-zinc-800 text-zinc-400 rounded-xl hover:text-white hover:border-zinc-700 transition-colors"
+            className="px-3 sm:px-4 py-2.5 sm:py-3 bg-zinc-950 border border-zinc-800 text-zinc-300 rounded-xl hover:text-white hover:border-zinc-700 transition-colors text-xs sm:text-sm font-bold font-mono active:scale-95"
             title="Add 10 Seconds"
           >
-            <Plus className="w-4 h-4" />
+            +10s
           </button>
 
           <button
             onClick={handleReset}
-            className="p-2.5 bg-zinc-950 border border-zinc-800 text-zinc-400 rounded-xl hover:text-white hover:border-zinc-700 transition-colors"
+            className="p-2.5 sm:p-3 bg-zinc-950 border border-zinc-800 text-zinc-400 rounded-xl hover:text-white hover:border-zinc-700 transition-colors active:scale-95"
             title="Reset Timer"
           >
             <RotateCcw className="w-4 h-4" />
@@ -319,52 +306,52 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
 
         {/* Session Time & Sets Remaining Card */}
         {(sessionRemainingSeconds !== undefined || sessionTotalPlannedSets !== undefined) && (
-          <div className="w-full bg-zinc-950/70 border border-zinc-800/80 rounded-2xl p-3 text-left">
+          <div className="w-full bg-zinc-950/80 border border-zinc-800/80 rounded-2xl p-3 sm:p-3.5">
             <div className="grid grid-cols-2 gap-3 items-center">
               {/* Session Time Remaining */}
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="p-2 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-xl flex-shrink-0">
-                  <Hourglass className="w-4 h-4" />
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 sm:p-2.5 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-xl flex-shrink-0">
+                  <Hourglass className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div className="min-w-0">
-                  <div className="text-[9px] font-black uppercase tracking-wider text-zinc-500 truncate">
+                <div className="min-w-0 text-left">
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-zinc-400 block">
                     Session Left
-                  </div>
-                  <div 
-                    className="text-sm font-black font-mono text-orange-400 truncate"
+                  </span>
+                  <span 
+                    className="text-sm sm:text-base font-black font-mono text-orange-400 truncate block mt-0.5"
                     title={sessionForecastSeconds !== undefined ? `Forecast Total: ${formatDuration(sessionForecastSeconds)}` : undefined}
                   >
                     {formatDuration(sessionRemainingSeconds ?? 0)}
-                  </div>
+                  </span>
                 </div>
               </div>
 
               {/* Sets Remaining */}
-              <div className="flex items-center gap-2.5 border-l border-zinc-800/80 pl-3 min-w-0">
-                <div className="p-2 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-xl flex-shrink-0">
-                  <Dumbbell className="w-4 h-4" />
+              <div className="flex items-center gap-3 min-w-0 border-l border-zinc-800 pl-3">
+                <div className="p-2 sm:p-2.5 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-xl flex-shrink-0">
+                  <Dumbbell className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div className="min-w-0">
-                  <div className="text-[9px] font-black uppercase tracking-wider text-zinc-500 truncate">
+                <div className="min-w-0 text-left">
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-zinc-400 block">
                     Sets Left
-                  </div>
-                  <div className="text-sm font-black font-mono text-white truncate">
+                  </span>
+                  <span className="text-sm sm:text-base font-black font-mono text-white truncate block mt-0.5">
                     {Math.max(0, (sessionTotalPlannedSets ?? 0) - (sessionCompletedSets ?? 0))}{' '}
                     {sessionTotalPlannedSets !== undefined && sessionTotalPlannedSets > 0 && (
-                      <span className="text-[10px] text-zinc-500 font-normal">
+                      <span className="text-xs text-zinc-400 font-normal">
                         ({sessionCompletedSets ?? 0}/{sessionTotalPlannedSets})
                       </span>
                     )}
-                  </div>
+                  </span>
                 </div>
               </div>
             </div>
 
             {sessionForecastSeconds !== undefined && sessionForecastSeconds > 0 && (
-              <div className="mt-2.5 pt-2 border-t border-zinc-900 flex items-center justify-between text-[9px] font-mono text-zinc-500">
-                <span>Total Forecast: <span className="text-zinc-400 font-bold">{formatDuration(sessionForecastSeconds)}</span></span>
+              <div className="mt-2.5 pt-2 border-t border-zinc-900/90 flex items-center justify-between text-[11px] font-mono text-zinc-400">
+                <span>Forecast: <span className="text-zinc-300 font-bold">{formatDuration(sessionForecastSeconds)}</span></span>
                 {sessionTotalPlannedSets !== undefined && sessionTotalPlannedSets > 0 && (
-                  <span>
+                  <span className="font-semibold text-zinc-300">
                     {Math.min(100, Math.round(((sessionCompletedSets ?? 0) / sessionTotalPlannedSets) * 100))}% done
                   </span>
                 )}
@@ -373,12 +360,12 @@ export const RestTimerModal: React.FC<RestTimerModalProps> = ({
           </div>
         )}
 
-        {/* Cancel / Dismiss Button */}
+        {/* Dismiss Button */}
         <button
           onClick={onClose}
-          className="w-full py-2.5 bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 text-xs font-black uppercase tracking-widest rounded-xl transition-colors"
+          className="w-full py-2.5 sm:py-3 bg-zinc-950/80 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl transition-colors active:scale-95"
         >
-          Cancel / Dismiss
+          Dismiss Timer
         </button>
       </div>
     </div>
